@@ -1,0 +1,35 @@
+{
+  "name": "pos-backend",
+  "version": "1.0.0",
+  "description": "Omni-channel POS backend (NestJS + PostgreSQL + Socket.io)",
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "lint": "eslint \"src/**/*.ts\" --fix"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.4",
+    "@nestjs/config": "^3.2.3",
+    "@nestjs/core": "^10.4.4",
+    "@nestjs/platform-express": "^10.4.4",
+    "@nestjs/platform-socket.io": "^10.4.4",
+    "@nestjs/websockets": "^10.4.4",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "iconv-lite": "^0.6.3",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.12.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.4.5",
+    "@types/multer": "^1.4.13",
+    "@types/node": "^20.14.10",
+    "@types/pg": "^8.11.6",
+    "typescript": "5.4.5"
+  }
+}
