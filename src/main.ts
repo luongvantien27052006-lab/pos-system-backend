@@ -1,3 +1,4 @@
+import 'dotenv/config'; // Ép nạp file .env ngay khi bật server local
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';

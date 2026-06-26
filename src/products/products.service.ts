@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
 import { DatabaseService } from '../database/database.service';
+import { InventorySyncService } from '../sync/inventory-sync.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UPLOAD_DIR } from './multer.config';
@@ -24,7 +25,10 @@ function mapProduct(r: ProductRow) {
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly sync: InventorySyncService, // ĐỒNG BỘ sang App F&B
+  ) {}
 
   /** Tạo món mới; image_url là đường dẫn file đã lưu (vd: /uploads/xxx.png). */
   async create(dto: CreateProductDto, imageUrl: string) {
@@ -42,7 +46,9 @@ export class ProductsService {
                  is_available AS "isAvailable", is_active AS "isActive"`,
       [dto.category_id, dto.name, dto.price, imageUrl],
     );
-    return mapProduct(row!);
+    const product = mapProduct(row!);
+    await this.sync.enqueueProductUpsert(product.id); // -> đẩy món sang App
+    return product;
   }
 
   /** Danh sách toàn bộ món (cả ngừng bán) cho trang quản trị. */
@@ -116,7 +122,9 @@ export class ProductsService {
       const oldName = existing.imageUrl.replace('/uploads/', '');
       await unlink(join(UPLOAD_DIR, oldName)).catch(() => undefined);
     }
-    return mapProduct(row!);
+    const product = mapProduct(row!);
+    await this.sync.enqueueProductUpsert(product.id); // -> App cập nhật tên/giá/ảnh/danh mục
+    return product;
   }
 
   /** Mở bán lại món đã ngừng. */
@@ -126,6 +134,7 @@ export class ProductsService {
       [id],
     );
     if (!row) throw new BadRequestException('Không tìm thấy món');
+    await this.sync.enqueueAvailability(id); // -> App mở lại món
     return { ok: true, id };
   }
 
@@ -139,6 +148,21 @@ export class ProductsService {
       [id],
     );
     if (!row) throw new BadRequestException('Không tìm thấy món');
+    await this.sync.enqueueAvailability(id); // -> App ẩn món
     return { ok: true, id };
+  }
+
+  /**
+   * (TÙY CHỌN) Bật/tắt nhanh "hết hàng tạm thời" mà không ngừng bán hẳn.
+   * Nếu trang Admin của bạn có nút Hết hàng / Còn hàng riêng, gọi hàm này.
+   */
+  async setAvailability(id: number, isAvailable: boolean) {
+    const row = await this.db.queryOne(
+      `UPDATE products SET is_available = $2 WHERE id = $1 RETURNING id`,
+      [id, isAvailable],
+    );
+    if (!row) throw new BadRequestException('Không tìm thấy món');
+    await this.sync.enqueueAvailability(id); // -> App khóa/mở món
+    return { ok: true, id, isAvailable };
   }
 }

@@ -10,7 +10,8 @@ import { PaymentsModule } from './payments/payments.module';
 import { ProductsModule } from './products/products.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { TablesModule } from './tables/tables.module';
-
+import { SyncModule } from './sync/sync.module';
+import { PrintingModule } from './printing/printing.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
@@ -22,9 +23,8 @@ import { TablesModule } from './tables/tables.module';
     ProductsModule, // Quản lý sản phẩm + upload ảnh
     OrdersModule, // Phần 2.2 — tạo phiên, thêm món append-only, 3 kịch bản nghiệp vụ
     PaymentsModule, // Phần 2.4 — VietQR động + webhook SePay (idempotency)
-    // Phần 2.3: PrintingModule  (in kép ESC/POS qua TCP 9100)
-    // Phần 2.4: PaymentsModule  (VietQR động + webhook ngân hàng -> PAID)
-    // Phần 2.5: DashboardModule (doanh thu real-time)
+    PrintingModule,  //(in kép ESC/POS qua TCP 9100)
+    SyncModule,
   ],
   controllers: [AppController],
 })
