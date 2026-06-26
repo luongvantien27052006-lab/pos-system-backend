@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AppOrderView } from '../app-orders/app-orders.types';
 import { OrderSessionView } from '../orders/types/order.types';
 import {
   divider,
@@ -122,6 +123,89 @@ export class PrintingService {
       b.align('center').line('Cảm ơn Quý khách!');
     } else {
       b.align('center').line('Làm xong gạch mực • Cuối ca đối chiếu');
+    }
+
+    b.cut();
+    return b.build();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  //  ĐƠN ONLINE TỪ APP — in 2 liên: phiếu giao/gói + phiếu chế biến
+  // ─────────────────────────────────────────────────────────────────────────
+  async printAppOrder(order: AppOrderView): Promise<void> {
+    const data = Buffer.concat([
+      this.renderAppLien(order, 'PACKING'),
+      this.renderAppLien(order, 'KITCHEN'),
+    ]);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await sendToPrinter(this.host, this.port, data);
+        this.logger.log(`Đã in đơn online ${order.orderCode}`);
+        return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.logger.warn(
+          `In đơn online ${order.orderCode} thất bại (lần ${attempt}): ${msg}`,
+        );
+      }
+    }
+    this.logger.error(
+      `KHÔNG in được đơn online ${order.orderCode} (máy in ${this.host}:${this.port}).`,
+    );
+  }
+
+  private renderAppLien(order: AppOrderView, kind: 'PACKING' | 'KITCHEN'): Buffer {
+    const b = new EscPosBuilder(this.mode, this.codepage).init();
+    const isPacking = kind === 'PACKING';
+    const typeLabel = order.fulfillment === 'DELIVERY' ? 'GIAO HÀNG' : 'KHÁCH LẤY';
+
+    b.align('center').bold(true).size(2, 2);
+    b.line(isPacking ? `ĐƠN ONLINE - ${typeLabel}` : 'PHIẾU CHẾ BIẾN (ONLINE)');
+    b.size(1, 1).bold(false);
+    b.line(isPacking ? this.shopName : '(LƯU QUẦY - PHA CHẾ)');
+    b.line();
+
+    b.align('left');
+    b.line(`Mã đơn: ${order.orderCode}`);
+    b.line(`Giờ: ${new Date(order.receivedAt).toLocaleString('vi-VN')}`);
+    if (isPacking) {
+      b.line(`Khách: ${order.customerName ?? '-'}`);
+      if (order.customerPhone) b.line(`DT: ${order.customerPhone}`);
+      if (order.fulfillment === 'DELIVERY' && order.customerAddress) {
+        b.line(`Dia chi: ${order.customerAddress}`);
+      }
+      b.line(`Thanh toan: ${order.paymentMethod === 'COD' ? 'COD (thu ho)' : 'Da CK'}`);
+    }
+    b.line(divider());
+
+    for (const it of order.items) {
+      if (isPacking) {
+        b.bold(true)
+          .line(
+            row(
+              `${it.quantity} x ${it.name}`,
+              `${formatVnd(it.unitPrice * it.quantity)} đ`,
+            ),
+          )
+          .bold(false);
+      } else {
+        b.bold(true).size(1, 2).line(`${it.quantity} x ${it.name}`);
+        b.size(1, 1).bold(false);
+      }
+      if (it.note) b.line(`   (Ghi chú: ${it.note})`);
+      b.line();
+    }
+    b.line(divider());
+
+    if (isPacking) {
+      b.bold(true).size(1, 2).line(row('TỔNG CỘNG:', `${formatVnd(order.totalAmount)} đ`));
+      b.size(1, 1).bold(false);
+      if (order.paymentMethod === 'COD') {
+        b.bold(true).line(row('THU KHÁCH:', `${formatVnd(order.totalAmount)} đ`)).bold(false);
+      }
+      b.line().align('center').line('Cảm ơn Quý khách!');
+    } else {
+      b.align('center').line('Làm xong gạch mực');
     }
 
     b.cut();

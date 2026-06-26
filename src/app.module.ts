@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { validateEnv } from './config/env.validation';
+import { AppOrdersModule } from './app-orders/app-orders.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { DatabaseModule } from './database/database.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -9,9 +10,10 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ProductsModule } from './products/products.module';
 import { RealtimeModule } from './realtime/realtime.module';
-import { TablesModule } from './tables/tables.module';
+import { StaffModule } from './staff/staff.module';
 import { SyncModule } from './sync/sync.module';
-import { PrintingModule } from './printing/printing.module';
+import { TablesModule } from './tables/tables.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
@@ -20,11 +22,15 @@ import { PrintingModule } from './printing/printing.module';
     DashboardModule, // Phần 2.5 — doanh thu real-time (global)
     CatalogModule, // Phần 3 — menu + danh sách bàn cho frontend
     TablesModule, // Quản lý bàn (thêm/ngừng dùng) + nguồn cho mã QR
+    StaffModule, // Xác thực PIN nhân viên + đổi PIN
     ProductsModule, // Quản lý sản phẩm + upload ảnh
     OrdersModule, // Phần 2.2 — tạo phiên, thêm món append-only, 3 kịch bản nghiệp vụ
     PaymentsModule, // Phần 2.4 — VietQR động + webhook SePay (idempotency)
-    PrintingModule,  //(in kép ESC/POS qua TCP 9100)
-    SyncModule,
+    SyncModule, // Tích hợp: đồng bộ menu/kho + đẩy trạng thái đơn sang App
+    AppOrdersModule, // Tích hợp: nhận đơn online từ App, in bếp, cập nhật trạng thái
+    // Phần 2.3: PrintingModule  (in kép ESC/POS qua TCP 9100)
+    // Phần 2.4: PaymentsModule  (VietQR động + webhook ngân hàng -> PAID)
+    // Phần 2.5: DashboardModule (doanh thu real-time)
   ],
   controllers: [AppController],
 })

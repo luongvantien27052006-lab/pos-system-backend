@@ -23,6 +23,10 @@ export const EVENTS = {
   ORDER_PAID: 'order:paid',
   /** Dashboard nhảy số doanh thu. */
   REVENUE_UPDATED: 'revenue:updated',
+  /** Đơn online từ App vừa tới — màn thu ngân hiện + chuông. */
+  APP_ORDER_INCOMING: 'app_order:incoming',
+  /** Trạng thái chế biến đơn online thay đổi. */
+  APP_ORDER_STATUS: 'app_order:status',
 } as const;
 
 // ----- Kiểu payload dùng chung -----
@@ -46,4 +50,21 @@ export interface RevenueUpdatedPayload {
   total: number;
   totalCash: number;
   totalTransfer: number;
+}
+
+export interface AppOrderIncomingPayload {
+  id: number;
+  appOrderId: string;
+  orderCode: string;
+  fulfillment: 'DELIVERY' | 'PICKUP';
+  total: number;
+  customerName: string | null;
+  itemCount: number;
+}
+
+export interface AppOrderStatusPayload {
+  id: number;
+  appOrderId: string;
+  orderCode: string;
+  prepStatus: string;
 }

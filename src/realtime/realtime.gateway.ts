@@ -11,6 +11,8 @@ import {
 import { Server, Socket } from 'socket.io';
 import {
   EVENTS,
+  AppOrderIncomingPayload,
+  AppOrderStatusPayload,
   OrderPaidPayload,
   OrderPendingCashPayload,
   RevenueUpdatedPayload,
@@ -91,5 +93,15 @@ export class RealtimeGateway
         .to(ROOMS.table(tableNumber))
         .emit(EVENTS.ORDER_UPDATED, { sessionId });
     }
+  }
+
+  /** Đơn online từ App vừa tới — chỉ gửi tới các máy POS. */
+  emitAppOrderIncoming(payload: AppOrderIncomingPayload): void {
+    this.server.to(ROOMS.POS).emit(EVENTS.APP_ORDER_INCOMING, payload);
+  }
+
+  /** Trạng thái chế biến đơn online thay đổi — đồng bộ giữa các máy POS. */
+  emitAppOrderStatus(payload: AppOrderStatusPayload): void {
+    this.server.to(ROOMS.POS).emit(EVENTS.APP_ORDER_STATUS, payload);
   }
 }

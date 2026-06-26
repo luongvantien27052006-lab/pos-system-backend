@@ -1,16 +1,20 @@
 // =============================================================================
 //  REPO 1 (POS) · src/sync/inventory-sync.service.ts
-//  Đẩy thực đơn / trạng thái kho sang App F&B qua Railway Private Networking.
-//  Khớp với DatabaseService thật (query / queryOne) và schema products của bạn.
+//  Worker outbox duy nhất: đẩy menu/kho VÀ trạng thái đơn online sang App.
 // =============================================================================
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+
+const APP_URL = (process.env.APP_INTERNAL_URL ?? '').replace(/\/+$/, '');
+// ví dụ: http://app-backend.railway.internal:8080/api  (NHỚ kèm /api)
+const POS_PUBLIC_URL = (process.env.POS_PUBLIC_URL ?? '').replace(/\/+$/, '');
+const SECRET = process.env.INTERNAL_SYNC_SECRET ?? '';
 
 interface SyncRow {
   id: number;
   name: string;
   description: string | null;
-  price: string; // pg trả NUMERIC dạng chuỗi
+  price: string;
   imageUrl: string | null;
   isAvailable: boolean;
   isActive: boolean;
@@ -24,20 +28,7 @@ export class InventorySyncService {
   private readonly log = new Logger('InventorySync');
   constructor(private readonly db: DatabaseService) {}
 
-  // Chuyển các hằng số môi trường thành Getter bên trong Class để tránh nạp sớm ở máy local
-  private get appUrl(): string {
-    return (process.env.APP_INTERNAL_URL ?? '').replace(/\/+$/, '');
-  }
-
-  private get posPublicUrl(): string {
-    return (process.env.POS_PUBLIC_URL ?? '').replace(/\/+$/, '');
-  }
-
-  private get secret(): string {
-    return process.env.INTERNAL_SYNC_SECRET ?? '';
-  }
-
-  // ── Đưa event vào outbox (gọi từ ProductsService sau mỗi thao tác Admin) ──
+  // ── enqueue (gọi từ ProductsService) ──
   async enqueueProductUpsert(productId: number): Promise<void> {
     await this.db.query(
       `INSERT INTO sync_outbox (event_type, payload) VALUES ('product.upsert', $1)`,
@@ -51,7 +42,7 @@ export class InventorySyncService {
     );
   }
 
-  // ── Worker: đẩy các event PENDING, retry + backoff nếu lỗi ──
+  // ── Worker: đẩy các event PENDING, retry + backoff ──
   async drainOutbox(): Promise<void> {
     const events = await this.db.query<{
       id: number; event_id: string; event_type: string; payload: any; attempts: number;
@@ -67,11 +58,15 @@ export class InventorySyncService {
           await this.pushProduct(ev.payload.productId, ev.event_id);
         } else if (ev.event_type === 'availability') {
           await this.pushAvailability(ev.payload.productId, ev.event_id);
+        } else if (ev.event_type === 'app_order.status') {
+          await this.pushOrderStatus(ev.payload.appOrderId, ev.payload.status, ev.event_id);
         }
         await this.db.query(`UPDATE sync_outbox SET status = 'DONE' WHERE id = $1`, [ev.id]);
       } catch (e) {
+        const err = e as any;
+        const reason = err?.cause?.code || err?.cause?.message || err?.message || String(e);
         const attempts = ev.attempts + 1;
-        const backoff = Math.min(2 ** attempts, 300); // tối đa 5 phút
+        const backoff = Math.min(2 ** attempts, 300);
         await this.db.query(
           `UPDATE sync_outbox
               SET attempts = $2,
@@ -80,7 +75,7 @@ export class InventorySyncService {
             WHERE id = $1`,
           [ev.id, attempts, backoff],
         );
-        this.log.warn(`Đẩy ${ev.event_type} #${ev.payload?.productId} lỗi (lần ${attempts}): ${(e as Error).message}`);
+        this.log.warn(`Đẩy ${ev.event_type} lỗi (lần ${attempts}): ${reason}`);
       }
     }
   }
@@ -89,15 +84,13 @@ export class InventorySyncService {
   private absImage(rel: string | null): string | undefined {
     if (!rel) return undefined;
     if (/^https?:\/\//.test(rel)) return rel;
-    return this.posPublicUrl + rel; // Sử dụng getter lười
+    return POS_PUBLIC_URL + rel;
   }
 
   private async callApp(path: string, body: unknown): Promise<any> {
-    // Ép tạo URL tuyệt đối từ hàm getter tại thời điểm thực thi request
-    const targetUrl = this.appUrl + path;
-    const res = await fetch(targetUrl, {
+    const res = await fetch(APP_URL + path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-secret': this.secret },
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': SECRET },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(8000),
     });
@@ -121,10 +114,9 @@ export class InventorySyncService {
     );
   }
 
-  // ── Đẩy 1 món sang App (App: POST /internal/menu/upsert) ──
   private async pushProduct(productId: number, eventId: string): Promise<void> {
     const r = await this.loadRow(productId);
-    if (!r) return; // món bị xoá khỏi DB — bỏ qua
+    if (!r) return;
     if (!r.appCategory) {
       throw new Error(`Danh mục của món #${productId} chưa gán app_category (COFFEE/MILK_TEA/TEA)`);
     }
@@ -139,16 +131,14 @@ export class InventorySyncService {
       category: r.appCategory,
       price,
       imageUrl: this.absImage(r.imageUrl),
-      isAvailable: r.isActive && r.isAvailable, // ngừng bán HOẶC hết hàng => ẩn trên app
+      isAvailable: r.isActive && r.isAvailable,
       displayOrder: r.displayOrder ?? 0,
     });
-
     if (ack?.appProductId && !r.appProductId) {
       await this.db.query(`UPDATE products SET app_product_id = $2 WHERE id = $1`, [r.id, ack.appProductId]);
     }
   }
 
-  // ── Khóa/mở món real-time (App: POST /internal/menu/availability) ──
   private async pushAvailability(productId: number, eventId: string): Promise<void> {
     const r = await this.loadRow(productId);
     if (!r) return;
@@ -159,10 +149,15 @@ export class InventorySyncService {
     });
   }
 
-  // ── Test private networking: POS chủ động gọi App ──
+  // ── Đẩy trạng thái đơn online về App ──
+  private async pushOrderStatus(appOrderId: string, status: string, eventId: string): Promise<void> {
+    await this.callApp('/internal/orders/status', { eventId, appOrderId, status });
+  }
+
+  // ── Test private networking ──
   async pingApp(): Promise<any> {
-    const res = await fetch(this.appUrl + '/internal/ping', {
-      headers: { 'x-internal-secret': this.secret },
+    const res = await fetch(APP_URL + '/internal/ping', {
+      headers: { 'x-internal-secret': SECRET },
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) throw new Error(`App ${res.status}: ${await res.text()}`);
