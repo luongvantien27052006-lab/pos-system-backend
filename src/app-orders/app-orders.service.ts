@@ -56,7 +56,7 @@ export class AppOrdersService {
          (app_order_id, order_code, fulfillment, payment_method, payment_status,
           customer_name, customer_phone, customer_address, items, total_amount,
           prep_status, note, received_at, paid_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,
+       VALUES ($1,$2,$3,$4,$5::text,$6,$7,$8,$9::jsonb,$10,$11,$12,
                COALESCE($13::timestamptz, NOW()),
                CASE WHEN $5::text = 'PAID' THEN NOW() ELSE NULL END)
        ON CONFLICT (app_order_id) DO NOTHING
