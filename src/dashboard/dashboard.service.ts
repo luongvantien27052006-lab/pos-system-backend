@@ -25,30 +25,60 @@ export class DashboardService {
   async getTodayRevenue(): Promise<RevenueUpdatedPayload> {
     const row = await this.db.queryOne<{
       date: string;
-      total: string;
-      cash: string;
-      transfer: string;
+      s_total: string;
+      s_cash: string;
+      s_transfer: string;
+      a_total: string;
+      a_cash: string;
+      a_transfer: string;
     }>(
       `WITH bounds AS (
          SELECT date_trunc('day', NOW() AT TIME ZONE $1) AT TIME ZONE $1 AS day_start
        )
        SELECT
          to_char((NOW() AT TIME ZONE $1)::date, 'YYYY-MM-DD') AS date,
-         COALESCE(SUM(s.total_amount), 0) AS total,
-         COALESCE(SUM(s.total_amount) FILTER (WHERE s.payment_method = 'CASH'), 0) AS cash,
-         COALESCE(SUM(s.total_amount) FILTER (WHERE s.payment_method = 'BANK_TRANSFER'), 0) AS transfer
-       FROM order_sessions s, bounds b
-       WHERE s.status = 'PAID'
-         AND s.completed_at >= b.day_start
-         AND s.completed_at <  b.day_start + INTERVAL '1 day'`,
+         -- Đơn tại quầy/bàn (order_sessions)
+         COALESCE((SELECT SUM(s.total_amount) FROM order_sessions s, bounds b
+                    WHERE s.status = 'PAID'
+                      AND s.completed_at >= b.day_start
+                      AND s.completed_at <  b.day_start + INTERVAL '1 day'), 0) AS s_total,
+         COALESCE((SELECT SUM(s.total_amount) FROM order_sessions s, bounds b
+                    WHERE s.status = 'PAID' AND s.payment_method = 'CASH'
+                      AND s.completed_at >= b.day_start
+                      AND s.completed_at <  b.day_start + INTERVAL '1 day'), 0) AS s_cash,
+         COALESCE((SELECT SUM(s.total_amount) FROM order_sessions s, bounds b
+                    WHERE s.status = 'PAID' AND s.payment_method = 'BANK_TRANSFER'
+                      AND s.completed_at >= b.day_start
+                      AND s.completed_at <  b.day_start + INTERVAL '1 day'), 0) AS s_transfer,
+         -- Đơn online (app_orders) — COD tính tiền mặt, BANK_QR tính chuyển khoản
+         COALESCE((SELECT SUM(a.total_amount) FROM app_orders a, bounds b
+                    WHERE a.payment_status = 'PAID'
+                      AND a.paid_at >= b.day_start
+                      AND a.paid_at <  b.day_start + INTERVAL '1 day'), 0) AS a_total,
+         COALESCE((SELECT SUM(a.total_amount) FROM app_orders a, bounds b
+                    WHERE a.payment_status = 'PAID' AND a.payment_method = 'COD'
+                      AND a.paid_at >= b.day_start
+                      AND a.paid_at <  b.day_start + INTERVAL '1 day'), 0) AS a_cash,
+         COALESCE((SELECT SUM(a.total_amount) FROM app_orders a, bounds b
+                    WHERE a.payment_status = 'PAID' AND a.payment_method = 'BANK_QR'
+                      AND a.paid_at >= b.day_start
+                      AND a.paid_at <  b.day_start + INTERVAL '1 day'), 0) AS a_transfer`,
       [this.timezone],
     );
 
+    const sTotal = Number(row?.s_total ?? 0);
+    const sCash = Number(row?.s_cash ?? 0);
+    const sTransfer = Number(row?.s_transfer ?? 0);
+    const aTotal = Number(row?.a_total ?? 0);
+    const aCash = Number(row?.a_cash ?? 0);
+    const aTransfer = Number(row?.a_transfer ?? 0);
+
     return {
       date: row?.date ?? '',
-      total: Number(row?.total ?? 0),
-      totalCash: Number(row?.cash ?? 0),
-      totalTransfer: Number(row?.transfer ?? 0),
+      total: sTotal + aTotal,
+      totalCash: sCash + aCash,
+      totalTransfer: sTransfer + aTransfer,
+      appTotal: aTotal,
     };
   }
 

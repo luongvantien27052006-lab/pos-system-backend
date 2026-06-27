@@ -11,6 +11,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import {
   EVENTS,
+  AppOrderCancelledPayload,
   AppOrderIncomingPayload,
   AppOrderStatusPayload,
   OrderPaidPayload,
@@ -103,5 +104,10 @@ export class RealtimeGateway
   /** Trạng thái chế biến đơn online thay đổi — đồng bộ giữa các máy POS. */
   emitAppOrderStatus(payload: AppOrderStatusPayload): void {
     this.server.to(ROOMS.POS).emit(EVENTS.APP_ORDER_STATUS, payload);
+  }
+
+  /** Khách hủy đơn online — cảnh báo các máy POS (chuông + thẻ đỏ). */
+  emitAppOrderCancelled(payload: AppOrderCancelledPayload): void {
+    this.server.to(ROOMS.POS).emit(EVENTS.APP_ORDER_CANCELLED, payload);
   }
 }

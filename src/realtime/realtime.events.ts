@@ -27,6 +27,8 @@ export const EVENTS = {
   APP_ORDER_INCOMING: 'app_order:incoming',
   /** Trạng thái chế biến đơn online thay đổi. */
   APP_ORDER_STATUS: 'app_order:status',
+  /** Khách HỦY đơn online — màn thu ngân cảnh báo (chuông + thẻ đỏ). */
+  APP_ORDER_CANCELLED: 'app_order:cancelled',
 } as const;
 
 // ----- Kiểu payload dùng chung -----
@@ -50,6 +52,8 @@ export interface RevenueUpdatedPayload {
   total: number;
   totalCash: number;
   totalTransfer: number;
+  /** Phần doanh thu đến từ đơn online (App). Đã gộp sẵn vào `total`. */
+  appTotal: number;
 }
 
 export interface AppOrderIncomingPayload {
@@ -67,4 +71,11 @@ export interface AppOrderStatusPayload {
   appOrderId: string;
   orderCode: string;
   prepStatus: string;
+  paymentStatus: 'PENDING' | 'PAID';
+}
+
+export interface AppOrderCancelledPayload {
+  id: number;
+  appOrderId: string;
+  orderCode: string;
 }
