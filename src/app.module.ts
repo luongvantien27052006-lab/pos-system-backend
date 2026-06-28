@@ -4,6 +4,12 @@
 //  >> CHEP DE (thay file co san)
 // ==================================================================
 
+// ==================================================================
+//  POS BACKEND  (NestJS + raw pg)
+//  Dat tai:  src/app.module.ts
+//  >> CHEP DE (thay file co san)
+// ==================================================================
+
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
@@ -14,6 +20,7 @@ import { DatabaseModule } from './database/database.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
+import { OptionsModule } from './options/options.module';
 import { ProductsModule } from './products/products.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { StaffModule } from './staff/staff.module';
@@ -31,6 +38,7 @@ import { TablesModule } from './tables/tables.module';
     TablesModule, // Quản lý bàn (thêm/ngừng dùng) + nguồn cho mã QR
     StaffModule, // Xác thực PIN nhân viên + đổi PIN
     ProductsModule, // Quản lý sản phẩm + upload ảnh
+    OptionsModule, // Quản lý topping/tùy chọn + gán món
     OrdersModule, // Phần 2.2 — tạo phiên, thêm món append-only, 3 kịch bản nghiệp vụ
     PaymentsModule, // Phần 2.4 — VietQR động + webhook SePay (idempotency)
     SyncModule, // Tích hợp: đồng bộ menu/kho + đẩy trạng thái đơn sang App
