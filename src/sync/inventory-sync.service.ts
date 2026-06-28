@@ -1,3 +1,9 @@
+// ==================================================================
+//  POS BACKEND  (NestJS + raw pg)
+//  Dat tai:  src/sync/inventory-sync.service.ts
+//  >> CHEP DE (thay file co san)
+// ==================================================================
+
 // =============================================================================
 //  REPO 1 (POS) · src/sync/inventory-sync.service.ts
 //  Worker outbox duy nhất: đẩy menu/kho VÀ trạng thái đơn online sang App.
@@ -114,6 +120,32 @@ export class InventorySyncService {
     );
   }
 
+  /** Topping đang hoạt động của 1 món (để đẩy kèm sang App). */
+  private async loadOptions(
+    productId: number,
+  ): Promise<
+    { id: string; name: string; price: number; groupName: string | null }[]
+  > {
+    const rows = await this.db.query<{
+      id: number;
+      name: string;
+      price: string;
+      group_name: string | null;
+    }>(
+      `SELECT o.id, o.name, o.price, o.group_name
+         FROM product_options po JOIN options o ON o.id = po.option_id
+        WHERE po.product_id = $1 AND o.is_active = TRUE
+        ORDER BY o.group_name NULLS FIRST, o.name`,
+      [productId],
+    );
+    return rows.map((o) => ({
+      id: String(o.id),
+      name: o.name,
+      price: Number(o.price),
+      groupName: o.group_name,
+    }));
+  }
+
   private async pushProduct(productId: number, eventId: string): Promise<void> {
     const r = await this.loadRow(productId);
     if (!r) return;
@@ -122,6 +154,8 @@ export class InventorySyncService {
     }
     const price = Math.round(Number(r.price));
     if (price < 1000) throw new Error(`Giá món #${productId} < 1.000đ — App từ chối`);
+
+    const options = await this.loadOptions(productId);
 
     const ack = await this.callApp('/internal/menu/upsert', {
       eventId,
@@ -133,6 +167,7 @@ export class InventorySyncService {
       imageUrl: this.absImage(r.imageUrl),
       isAvailable: r.isActive && r.isAvailable,
       displayOrder: r.displayOrder ?? 0,
+      options,
     });
     if (ack?.appProductId && !r.appProductId) {
       await this.db.query(`UPDATE products SET app_product_id = $2 WHERE id = $1`, [r.id, ack.appProductId]);

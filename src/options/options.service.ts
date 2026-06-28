@@ -1,11 +1,12 @@
 // ==================================================================
 //  POS BACKEND  (NestJS + raw pg)
 //  Dat tai:  src/options/options.service.ts
-//  >> FILE MOI (tao moi)
+//  >> CHEP DE (thay file co san)
 // ==================================================================
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { InventorySyncService } from '../sync/inventory-sync.service';
 import { CreateOptionDto } from './dto/create-option.dto';
 import { UpdateOptionDto } from './dto/update-option.dto';
 
@@ -27,7 +28,11 @@ export interface OptionView {
 
 @Injectable()
 export class OptionsService {
-  constructor(private readonly db: DatabaseService) {}
+  private readonly logger = new Logger('Options');
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly sync: InventorySyncService,
+  ) {}
 
   /** Tất cả topping (kể cả đã ẩn) cho trang quản trị. */
   async list(): Promise<OptionView[]> {
@@ -78,7 +83,10 @@ export class OptionsService {
       params,
     );
     if (!row) throw new NotFoundException(`Không tìm thấy topping #${id}`);
-    return this.toView(row);
+    const view = this.toView(row);
+    // Topping đổi -> đẩy lại các món đang dùng nó sang App.
+    await this.resyncProductsOfOption(id);
+    return view;
   }
 
   /** Ẩn topping (soft delete) — giữ option_id để không vỡ đơn cũ. */
@@ -117,7 +125,32 @@ export class OptionsService {
         );
       }
     });
+    // Gán topping của món đổi -> đẩy lại món đó sang App.
+    await this.resync([productId]);
     return { productId, optionIds: unique };
+  }
+
+  // ── Re-sync sang App (best-effort, không chặn thao tác chính) ──
+  private async resync(productIds: number[]): Promise<void> {
+    for (const pid of productIds) {
+      try {
+        await this.sync.enqueueProductUpsert(pid);
+      } catch (e) {
+        this.logger.warn(
+          `Không enqueue đồng bộ topping cho món #${pid}: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
+      }
+    }
+  }
+
+  private async resyncProductsOfOption(optionId: number): Promise<void> {
+    const rows = await this.db.query<{ product_id: number }>(
+      `SELECT product_id FROM product_options WHERE option_id = $1`,
+      [optionId],
+    );
+    await this.resync(rows.map((r) => r.product_id));
   }
 
   private async getOne(id: number): Promise<OptionView> {
