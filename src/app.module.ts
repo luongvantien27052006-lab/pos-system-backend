@@ -1,3 +1,9 @@
+// ==================================================================
+//  POS BACKEND  (NestJS + raw pg)
+//  Dat tai:  src/app.module.ts
+//  >> CHEP DE (thay file co san)
+// ==================================================================
+
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
@@ -11,6 +17,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { ProductsModule } from './products/products.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { StaffModule } from './staff/staff.module';
+import { StoreModule } from './store/store.module';
 import { SyncModule } from './sync/sync.module';
 import { TablesModule } from './tables/tables.module';
 
@@ -28,6 +35,7 @@ import { TablesModule } from './tables/tables.module';
     PaymentsModule, // Phần 2.4 — VietQR động + webhook SePay (idempotency)
     SyncModule, // Tích hợp: đồng bộ menu/kho + đẩy trạng thái đơn sang App
     AppOrdersModule, // Tích hợp: nhận đơn online từ App, in bếp, cập nhật trạng thái
+    StoreModule, // Proxy cấu hình giờ mở/đóng cửa sang App
     // Phần 2.3: PrintingModule  (in kép ESC/POS qua TCP 9100)
     // Phần 2.4: PaymentsModule  (VietQR động + webhook ngân hàng -> PAID)
     // Phần 2.5: DashboardModule (doanh thu real-time)

@@ -1,3 +1,9 @@
+// ==================================================================
+//  POS BACKEND  (NestJS + raw pg)
+//  Dat tai:  src/app-orders/app-orders.service.ts
+//  >> CHEP DE — them helper printProductStamps + moc vao receiveFromApp
+// ==================================================================
+
 import {
   BadRequestException,
   Injectable,
@@ -56,9 +62,9 @@ export class AppOrdersService {
          (app_order_id, order_code, fulfillment, payment_method, payment_status,
           customer_name, customer_phone, customer_address, items, total_amount,
           prep_status, note, received_at, paid_at)
-       VALUES ($1,$2,$3,$4,$5::text,$6,$7,$8,$9::jsonb,$10,$11,$12,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,
                COALESCE($13::timestamptz, NOW()),
-               CASE WHEN $5::text = 'PAID' THEN NOW() ELSE NULL END)
+               CASE WHEN $5 = 'PAID' THEN NOW() ELSE NULL END)
        ON CONFLICT (app_order_id) DO NOTHING
        RETURNING id`,
       [
@@ -93,12 +99,16 @@ export class AppOrdersService {
     // In phiếu bếp chạy NỀN — không để máy in làm treo response trả về App.
     void this.printing
       .printAppOrder(view)
-      .then(() =>
-        this.db.query(
+      .then(() => {
+        // IN TEM DÁN LY chạy nền ngay sau khi in phiếu bếp xong.
+        // (printProductStamps tự bao try/catch -> không bao giờ reject.)
+        void this.printProductStamps(view);
+        // Đánh dấu đã in phiếu (lỗi DB nếu có sẽ rơi vào .catch bên dưới).
+        return this.db.query(
           `UPDATE app_orders SET printed_at = NOW() WHERE id = $1 AND printed_at IS NULL`,
           [inserted.id],
-        ),
-      )
+        );
+      })
       .catch((e) =>
         this.logger.warn(
           `In đơn ${view.orderCode} lỗi nền: ${e instanceof Error ? e.message : String(e)}`,
@@ -219,6 +229,58 @@ export class AppOrdersService {
   // =========================================================================
   //  HELPER
   // =========================================================================
+  /**
+   * IN TEM DÁN LY/MÓN — chạy NỀN, không chặn luồng nhận đơn.
+   *
+   * Phân rã giỏ hàng về từng ly: món số lượng N -> in N tem rời. Đánh số
+   * TUYẾN TÍNH toàn đơn "Ly X / Y" (Y = tổng số ly cả đơn; X chạy liên tục,
+   * KHÔNG reset theo từng món).
+   *
+   * Ví dụ: 2 Trà Sữa + 1 Cà Phê -> 3 tem: "Ly 1/3", "Ly 2/3", "Ly 3/3".
+   */
+  private async printProductStamps(view: AppOrderView): Promise<void> {
+    try {
+      // [B1] Tổng số ly toàn đơn (mẫu số Y) — sum mọi item.quantity.
+      const totalCups = view.items.reduce((sum, it) => sum + it.quantity, 0);
+
+      // [B2] Biến đếm tuyến tính toàn đơn (tử số X), khởi tạo NGOÀI vòng lặp.
+      let currentCup = 1;
+
+      // [B3] Vòng lặp lồng nhau: ngoài duyệt món, trong chạy theo số lượng ly.
+      for (const item of view.items) {
+        // Topping/đường-đá có thể nằm trong JSONB nhưng chưa khai báo ở type
+        // AppOrderItem -> đọc an toàn, mặc định [] khi App chưa gửi.
+        const options =
+          (item as AppOrderItem & { options?: unknown[] }).options ?? [];
+
+        for (let i = 1; i <= item.quantity; i++) {
+          await this.printing.printProductStamp({
+            orderCode: view.orderCode,
+            customerName: view.customerName ?? 'Khách App',
+            customerPhone: view.customerPhone ?? '',
+            fulfillment: view.fulfillment,
+            itemName: item.name,
+            currentCup,
+            totalCups,
+            options,
+            note: item.note ?? '',
+          });
+          currentCup++;
+        }
+      }
+
+      this.logger.log(`Đã in ${totalCups} tem ly cho đơn ${view.orderCode}`);
+    } catch (e) {
+      // Máy in tem lỗi (hết giấy / mất mạng) -> CHỈ cảnh báo log, KHÔNG làm
+      // sập luồng nhận đơn chính.
+      this.logger.warn(
+        `In tem ly đơn ${view.orderCode} lỗi nền: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    }
+  }
+
   private emitStatus(view: AppOrderView): void {
     this.realtime.emitAppOrderStatus({
       id: view.id,

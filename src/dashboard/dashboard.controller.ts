@@ -1,3 +1,9 @@
+// ==================================================================
+//  POS BACKEND  (NestJS + raw pg)
+//  Dat tai:  src/dashboard/dashboard.controller.ts
+//  >> CHEP DE (thay file co san)
+// ==================================================================
+
 import { Controller, Get } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 
@@ -12,5 +18,11 @@ export class DashboardController {
   @Get('revenue/today')
   todayRevenue() {
     return this.dashboard.getTodayRevenue();
+  }
+
+  /** Doanh thu tháng hiện tại (từ ngày 1 đến nay). Admin gọi khi mở dashboard. */
+  @Get('revenue/month')
+  monthlyRevenue() {
+    return this.dashboard.getMonthlyRevenue();
   }
 }

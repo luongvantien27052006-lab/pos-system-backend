@@ -1,3 +1,9 @@
+// ==================================================================
+//  POS BACKEND  (NestJS + raw pg)
+//  Dat tai:  src/printing/printing.service.ts
+//  >> CHEP DE — them ProductStampPayload + printProductStamp
+// ==================================================================
+
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppOrderView } from '../app-orders/app-orders.types';
@@ -12,6 +18,53 @@ import {
 import { sendToPrinter } from './printer.transport';
 
 type LienKind = 'CUSTOMER' | 'KITCHEN';
+
+/** Dữ liệu 1 con tem dán ly/món gửi xuống máy in tem. */
+export interface ProductStampPayload {
+  orderCode: string;
+  customerName: string;
+  customerPhone: string;
+  fulfillment: string; // 'DELIVERY' | 'PICKUP'
+  itemName: string;
+  currentCup: number; // tử số X — vị trí ly hiện tại trong toàn đơn
+  totalCups: number; // mẫu số Y — tổng số ly toàn đơn
+  options: unknown[]; // topping / mức đường - đá của ly
+  note: string;
+}
+
+/**
+ * Chuyển mảng tùy chọn (topping/đường-đá) — vốn lưu JSONB nên hình dạng linh
+ * hoạt — về danh sách dòng chữ để in lên tem. Chấp nhận: chuỗi, {name/label},
+ * {name,value}, hoặc fallback JSON.
+ */
+function stampOptionLines(options: unknown[]): string[] {
+  if (!Array.isArray(options)) return [];
+  const lines: string[] = [];
+  for (const o of options) {
+    if (o == null) continue;
+    if (typeof o === 'string') {
+      if (o.trim()) lines.push(o.trim());
+      continue;
+    }
+    if (typeof o === 'object') {
+      const r = o as Record<string, unknown>;
+      const label = r.label ?? r.name ?? r.title ?? r.optionName;
+      const value = r.value ?? r.choice ?? r.selected;
+      if (typeof label === 'string' && typeof value === 'string') {
+        lines.push(`${label}: ${value}`);
+      } else if (typeof label === 'string') {
+        lines.push(label);
+      } else if (typeof value === 'string') {
+        lines.push(value);
+      } else {
+        lines.push(JSON.stringify(o));
+      }
+      continue;
+    }
+    lines.push(String(o));
+  }
+  return lines;
+}
 
 /**
  * Cơ chế in kép (Dual-print) thay màn hình bếp.
@@ -152,6 +205,67 @@ export class PrintingService {
     this.logger.error(
       `KHÔNG in được đơn online ${order.orderCode} (máy in ${this.host}:${this.port}).`,
     );
+  }
+
+  /**
+   * In 1 con tem dán ly/món. Thử lại 1 lần; nếu vẫn lỗi -> NÉM ra để lớp gọi
+   * (AppOrdersService.printProductStamps) ghi log tổng và không chặn luồng.
+   */
+  async printProductStamp(payload: ProductStampPayload): Promise<void> {
+    const data = this.renderProductStamp(payload);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await sendToPrinter(this.host, this.port, data);
+        return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.logger.warn(
+          `In tem ly ${payload.currentCup}/${payload.totalCups} đơn ${payload.orderCode} thất bại (lần ${attempt}): ${msg}`,
+        );
+      }
+    }
+    throw new Error(
+      `Không in được tem ly ${payload.currentCup}/${payload.totalCups} đơn ${payload.orderCode}`,
+    );
+  }
+
+  /** Dựng nội dung ESC/POS cho 1 con tem ly. */
+  private renderProductStamp(p: ProductStampPayload): Buffer {
+    const b = new EscPosBuilder(this.mode, this.codepage).init();
+    const typeLabel = p.fulfillment === 'DELIVERY' ? 'GIAO HÀNG' : 'KHÁCH LẤY';
+
+    // Số thứ tự ly TO + đậm để pha chế nhìn là biết ngay.
+    b.align('center').bold(true).size(2, 2);
+    b.line(`Ly ${p.currentCup}/${p.totalCups}`);
+    b.size(1, 1).bold(false);
+    b.line(`${p.orderCode}  -  ${typeLabel}`);
+    b.line(divider());
+
+    // Tên món (cỡ chữ cao).
+    b.align('left').bold(true).size(1, 2);
+    b.line(p.itemName);
+    b.size(1, 1).bold(false);
+
+    // Tùy chọn topping / mức đường - đá.
+    for (const opt of stampOptionLines(p.options)) {
+      b.line(`+ ${opt}`);
+    }
+
+    // Ghi chú riêng của ly.
+    if (p.note && p.note.trim()) {
+      b.line(`(Ghi chú: ${p.note.trim()})`);
+    }
+
+    b.line(divider());
+
+    // Thông tin khách để gom đồ cuối luồng.
+    b.line(`KH: ${p.customerName}`);
+    if (p.customerPhone && p.customerPhone.trim()) {
+      b.line(`DT: ${p.customerPhone}`);
+    }
+
+    b.cut();
+    return b.build();
   }
 
   private renderAppLien(order: AppOrderView, kind: 'PACKING' | 'KITCHEN'): Buffer {
