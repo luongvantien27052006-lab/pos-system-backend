@@ -54,9 +54,20 @@ export class StaffService {
   }
 
   /** Đối chiếu PIN đăng nhập. */
+ /** Đối chiếu PIN đăng nhập. */
   async verify(pin: string): Promise<boolean> {
     await this.ensureReady();
     const hash = await this.getPinHash();
+    
+    // 🔍 ĐOẠN LOG GIÁM SÁT BẮT SỐNG DỮ LIỆU
+    console.log("==========================================");
+    console.log("[DEBUG PIN] Mã PIN người dùng gõ nhập vào:", pin);
+    console.log("[DEBUG PIN] Chuỗi mã hóa Backend đọc được từ DB:", hash);
+    console.log("==========================================");
+
+    // 🚀 MẸO KIỂM TRA: Bỏ dấu hai xẹt (//) ở dòng dưới nếu bạn muốn ÉP VÀO THẲNG HỆ THỐNG để test các tính năng khác:
+    // if (pin === '1234') return true;
+
     if (!hash) return false;
     return verifyPin(pin, hash);
   }

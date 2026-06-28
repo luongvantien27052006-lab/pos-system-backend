@@ -1,3 +1,9 @@
+// ==================================================================
+//  POS BACKEND  (NestJS + raw pg)
+//  Dat tai:  src/app-orders/dto/receive-app-order.dto.ts
+//  >> CHEP DE (thay file co san)
+// ==================================================================
+
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
@@ -28,6 +34,9 @@ export class AppOrderItemDto {
   @Type(() => Number) @IsInt() @Min(0) unitPrice!: number;
 
   @IsOptional() @IsString() note?: string;
+
+  /** Topping/tùy chọn của ly (mảng) — để in lên tem. App gửi kèm. */
+  @IsOptional() @IsArray() options?: unknown[];
 }
 
 /** Body App gửi sang POS: POST /api/internal/orders/incoming */
