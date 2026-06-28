@@ -27,7 +27,7 @@ async function bootstrap(): Promise<void> {
   });
 
   const port = Number(config.get('PORT') ?? 4000);
-  await app.listen(port, '::');
+  await app.listen(port, '0.0.0.0');
   new Logger('Bootstrap').log(
     `POS backend đang chạy tại http://localhost:${port}/api`,
   );
