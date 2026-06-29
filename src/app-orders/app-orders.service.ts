@@ -1,3 +1,9 @@
+// ==============================================================
+//  POS BACKEND
+//  src/app-orders/app-orders.service.ts
+//  >> CHEP DE (thay file co san)
+// ==============================================================
+
 // ==================================================================
 //  POS BACKEND  (NestJS + raw pg)
 //  Dat tai:  src/app-orders/app-orders.service.ts
@@ -55,7 +61,12 @@ export class AppOrdersService {
   async receiveFromApp(
     dto: ReceiveAppOrderDto,
   ): Promise<{ ok: true; id: number; duplicated: boolean }> {
+    try {
     const paymentStatus = dto.paymentStatus ?? 'PENDING';
+    // Tính paid_at ở JS (đơn đã trả -> NOW). TRÁNH tái dùng $5 trong SQL:
+    // dùng $5 vừa cho cột enum vừa cho `$5 = 'PAID'` khiến Postgres suy ra
+    // 2 kiểu khác nhau -> lỗi "inconsistent types deduced for parameter $5".
+    const paidAt = paymentStatus === 'PAID' ? new Date() : null;
 
     const inserted = await this.db.queryOne<{ id: number }>(
       `INSERT INTO app_orders
@@ -64,7 +75,7 @@ export class AppOrdersService {
           prep_status, note, received_at, paid_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,
                COALESCE($13::timestamptz, NOW()),
-               CASE WHEN $5 = 'PAID' THEN NOW() ELSE NULL END)
+               $14::timestamptz)
        ON CONFLICT (app_order_id) DO NOTHING
        RETURNING id`,
       [
@@ -81,6 +92,7 @@ export class AppOrdersService {
         dto.status ?? 'CONFIRMED',
         dto.note ?? null,
         dto.createdAt ?? null,
+        paidAt,
       ],
     );
 
@@ -131,6 +143,18 @@ export class AppOrdersService {
     }
 
     return { ok: true, id: view.id, duplicated: false };
+    } catch (e) {
+      // Lộ nguyên nhân 500 thật (constraint/enum/kiểu dữ liệu) thay vì
+      // "Internal server error" chung chung mà App nhận được.
+      this.logger.error(
+        `Nhận đơn ${dto.orderCode} (${dto.appOrderId}) LỖI: ` +
+          `${e instanceof Error ? e.message : String(e)} | ` +
+          `fulfillment=${dto.fulfillment} pay=${dto.paymentMethod}/` +
+          `${dto.paymentStatus ?? 'PENDING'} status=${dto.status ?? 'CONFIRMED'} ` +
+          `total=${dto.totalAmount} items=${dto.items?.length ?? 0}`,
+      );
+      throw e;
+    }
   }
 
   // =========================================================================
