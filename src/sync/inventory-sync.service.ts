@@ -1,8 +1,8 @@
-// ==================================================================
-//  POS BACKEND  (NestJS + raw pg)
-//  Dat tai:  src/sync/inventory-sync.service.ts
+// ================================================================
+//  POS BACKEND
+//  src/sync/inventory-sync.service.ts
 //  >> CHEP DE (thay file co san)
-// ==================================================================
+// ================================================================
 
 // =============================================================================
 //  REPO 1 (POS) · src/sync/inventory-sync.service.ts
@@ -26,6 +26,7 @@ interface SyncRow {
   isActive: boolean;
   displayOrder: number;
   appCategory: string | null;
+  categoryName: string;
   appProductId: string | null;
 }
 
@@ -112,6 +113,7 @@ export class InventorySyncService {
               p.is_active       AS "isActive",
               p.display_order   AS "displayOrder",
               c.app_category    AS "appCategory",
+              c.name            AS "categoryName",
               p.app_product_id  AS "appProductId"
          FROM products p
          JOIN categories c ON c.id = p.category_id
@@ -149,9 +151,6 @@ export class InventorySyncService {
   private async pushProduct(productId: number, eventId: string): Promise<void> {
     const r = await this.loadRow(productId);
     if (!r) return;
-    if (!r.appCategory) {
-      throw new Error(`Danh mục của món #${productId} chưa gán app_category (COFFEE/MILK_TEA/TEA)`);
-    }
     const price = Math.round(Number(r.price));
     if (price < 1000) throw new Error(`Giá món #${productId} < 1.000đ — App từ chối`);
 
@@ -162,7 +161,7 @@ export class InventorySyncService {
       posProductId: String(r.id),
       name: r.name,
       description: r.description || undefined,
-      category: r.appCategory,
+      category: r.categoryName,
       price,
       imageUrl: this.absImage(r.imageUrl),
       isAvailable: r.isActive && r.isAvailable,
