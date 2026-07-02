@@ -33,7 +33,8 @@ export class PrintController {
   async pull(
     @Headers('x-print-secret') secret: string,
     @Query('limit') limit?: string,
-  ) {
+  ): Promise<any> { 
+    // ^^^ Đã sửa lỗi TS4053 bằng cách ép kiểu dữ liệu trả về tường minh
     this.guard(secret);
     const n = Math.min(Math.max(Number(limit) || 10, 1), 50);
     const jobs = await this.queue.pull(n);
@@ -46,7 +47,8 @@ export class PrintController {
   async ack(
     @Headers('x-print-secret') secret: string,
     @Body() body: { ids?: string[] },
-  ) {
+  ): Promise<any> { 
+    // ^^^ Đã thêm kiểu dữ liệu trả về để phòng ngừa lỗi biên dịch
     this.guard(secret);
     await this.queue.ack(Array.isArray(body?.ids) ? body.ids : []);
     return { ok: true };
