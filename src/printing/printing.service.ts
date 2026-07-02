@@ -16,8 +16,10 @@ import {
   VietnameseMode,
 } from './escpos.builder';
 import { sendToPrinter } from './printer.transport';
+import { PrintQueueService } from './print-queue.service';
 
 type LienKind = 'CUSTOMER' | 'KITCHEN';
+type PrintMode = 'queue' | 'tcp';
 
 /** Dữ liệu 1 con tem dán ly/món gửi xuống máy in tem. */
 export interface ProductStampPayload {
@@ -81,14 +83,20 @@ export class PrintingService {
   private readonly mode: VietnameseMode;
   private readonly codepage: number;
   private readonly shopName: string;
+  private readonly dispatchMode: PrintMode;
 
-  constructor(config: ConfigService) {
+  constructor(
+    config: ConfigService,
+    private readonly queue: PrintQueueService,
+  ) {
     this.host = config.get<string>('PRINTER_HOST') ?? '127.0.0.1';
     this.port = Number(config.get('PRINTER_PORT') ?? 9100);
     this.mode =
       (config.get<string>('PRINTER_VIETNAMESE') as VietnameseMode) ?? 'strip';
     this.codepage = Number(config.get('PRINTER_CODEPAGE') ?? 0);
     this.shopName = config.get<string>('VIETQR_ACCOUNT_NAME') ?? 'QUAN CA PHE';
+    this.dispatchMode =
+      (config.get<string>('PRINTER_MODE') as PrintMode) ?? 'queue';
   }
 
   /**
@@ -101,21 +109,7 @@ export class PrintingService {
       this.renderLien(order, 'KITCHEN'),
     ]);
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        await sendToPrinter(this.host, this.port, data);
-        this.logger.log(`Đã in 2 liên cho đơn ${order.orderCode}`);
-        return;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        this.logger.warn(
-          `In đơn ${order.orderCode} thất bại (lần ${attempt}): ${msg}`,
-        );
-      }
-    }
-    this.logger.error(
-      `KHÔNG in được đơn ${order.orderCode} sau 2 lần thử (máy in ${this.host}:${this.port}).`,
-    );
+    await this.dispatch('bill', data, `đơn ${order.orderCode}`);
   }
 
   /** Dựng bytes ESC/POS cho 1 liên. */
@@ -190,21 +184,7 @@ export class PrintingService {
       this.renderAppLien(order, 'PACKING'),
       this.renderAppLien(order, 'KITCHEN'),
     ]);
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        await sendToPrinter(this.host, this.port, data);
-        this.logger.log(`Đã in đơn online ${order.orderCode}`);
-        return;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        this.logger.warn(
-          `In đơn online ${order.orderCode} thất bại (lần ${attempt}): ${msg}`,
-        );
-      }
-    }
-    this.logger.error(
-      `KHÔNG in được đơn online ${order.orderCode} (máy in ${this.host}:${this.port}).`,
-    );
+    await this.dispatch('bill', data, `đơn online ${order.orderCode}`);
   }
 
   /**
@@ -213,19 +193,10 @@ export class PrintingService {
    */
   async printProductStamp(payload: ProductStampPayload): Promise<void> {
     const data = this.renderProductStamp(payload);
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        await sendToPrinter(this.host, this.port, data);
-        return;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        this.logger.warn(
-          `In tem ly ${payload.currentCup}/${payload.totalCups} đơn ${payload.orderCode} thất bại (lần ${attempt}): ${msg}`,
-        );
-      }
-    }
-    throw new Error(
-      `Không in được tem ly ${payload.currentCup}/${payload.totalCups} đơn ${payload.orderCode}`,
+    await this.dispatch(
+      'stamp',
+      data,
+      `tem ly ${payload.currentCup}/${payload.totalCups} đơn ${payload.orderCode}`,
     );
   }
 
@@ -324,5 +295,40 @@ export class PrintingService {
 
     b.cut();
     return b.build();
+  }
+
+  /**
+   * Gửi lệnh in. MẶC ĐỊNH xếp vào HÀNG ĐỢI cho agent tại quán kéo về
+   * (backend cloud không với tới máy in LAN). Đặt PRINTER_MODE=tcp để in
+   * thẳng khi backend chạy cùng mạng với máy in. Không ném lỗi (best-effort).
+   */
+  private async dispatch(
+    target: 'bill' | 'stamp',
+    data: Buffer,
+    label: string,
+  ): Promise<void> {
+    if (this.dispatchMode === 'tcp') {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          await sendToPrinter(this.host, this.port, data);
+          this.logger.log(`Đã in ${label}`);
+          return;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          this.logger.warn(`In ${label} thất bại (lần ${attempt}): ${msg}`);
+        }
+      }
+      this.logger.error(
+        `KHÔNG in được ${label} (máy in ${this.host}:${this.port}).`,
+      );
+      return;
+    }
+    try {
+      await this.queue.enqueue(target, data);
+      this.logger.log(`Đã xếp lệnh in [${target}] (${label}) cho agent`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.logger.error(`Không xếp được lệnh in ${label}: ${msg}`);
+    }
   }
 }
