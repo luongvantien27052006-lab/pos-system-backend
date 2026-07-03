@@ -110,6 +110,49 @@ export class PrintingService {
     ]);
 
     await this.dispatch('bill', data, `đơn ${order.orderCode}`);
+    // In tem dán ly cho ĐƠN QUẦY (chạy nền, không ảnh hưởng bill).
+    void this.printSessionStamps(order);
+  }
+
+  /**
+   * In tem dán ly cho đơn tại quầy: mỗi ly một tem, đánh số X/Y toàn đơn.
+   * Best-effort — lỗi không chặn/không ảnh hưởng bill.
+   */
+  async printSessionStamps(order: OrderSessionView): Promise<void> {
+    try {
+      const totalCups = order.lines.reduce((s, l) => s + l.quantity, 0);
+      let currentCup = 1;
+      for (const line of order.lines) {
+        for (let i = 1; i <= line.quantity; i++) {
+          await this.printProductStamp({
+            orderCode: order.orderCode,
+            customerName:
+              order.tableNumber != null
+                ? `Bàn ${order.tableNumber}`
+                : 'Khách tại quầy',
+            customerPhone: '',
+            fulfillment: 'PICKUP',
+            itemName: line.name,
+            currentCup,
+            totalCups,
+            options: line.toppings,
+            note: line.note ?? '',
+          });
+          currentCup++;
+        }
+      }
+      if (totalCups > 0) {
+        this.logger.log(
+          `Đã xếp ${totalCups} tem ly cho đơn quầy ${order.orderCode}`,
+        );
+      }
+    } catch (e) {
+      this.logger.warn(
+        `In tem đơn quầy ${order.orderCode} lỗi nền: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    }
   }
 
   /** Dựng bytes ESC/POS cho 1 liên. */
