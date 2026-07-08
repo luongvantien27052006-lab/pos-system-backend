@@ -1,8 +1,14 @@
+// ============================================================
+//  POS BACKEND  src/staff/staff.service.ts
+//  >> CHEP DE (doi PIN theo target, chi admin)
+// ============================================================
+
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { hashPin, verifyPin } from './pin.util';
 
 const PIN_KEY = 'staff_pin_hash';
+const ADMIN_PIN_KEY = 'admin_pin_hash';
 
 @Injectable()
 export class StaffService {
@@ -33,7 +39,33 @@ export class StaffService {
         );
       }
     }
+    const adminHash = await this.getAdminPinHash();
+    if (!adminHash) {
+      const initialAdmin = process.env.ADMIN_PIN;
+      if (initialAdmin) {
+        await this.setPinHash(hashPin(initialAdmin), ADMIN_PIN_KEY);
+        this.logger.log('Đã khởi tạo mã PIN admin từ ADMIN_PIN');
+      }
+    }
     this.ready = true;
+  }
+
+  private async getAdminPinHash(): Promise<string | null> {
+    const row = await this.db.queryOne<{ value: string }>(
+      `SELECT value FROM app_settings WHERE key = $1`,
+      [ADMIN_PIN_KEY],
+    );
+    return row?.value ?? null;
+  }
+
+  /** Trả role theo PIN: admin > staff > null. */
+  async verifyRole(pin: string): Promise<'admin' | 'staff' | null> {
+    await this.ensureReady();
+    const adminHash = await this.getAdminPinHash();
+    if (adminHash && verifyPin(pin, adminHash)) return 'admin';
+    const staffHash = await this.getPinHash();
+    if (staffHash && verifyPin(pin, staffHash)) return 'staff';
+    return null;
   }
 
   private async getPinHash(): Promise<string | null> {
@@ -44,12 +76,12 @@ export class StaffService {
     return row?.value ?? null;
   }
 
-  private async setPinHash(hash: string): Promise<void> {
+  private async setPinHash(hash: string, key: string = PIN_KEY): Promise<void> {
     await this.db.query(
       `INSERT INTO app_settings (key, value, updated_at)
        VALUES ($1, $2, NOW())
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [PIN_KEY, hash],
+      [key, hash],
     );
   }
 
@@ -73,16 +105,22 @@ export class StaffService {
   }
 
   /** Đổi PIN: phải nhập đúng PIN hiện tại; PIN mới 4–6 chữ số. */
-  async changePin(currentPin: string, newPin: string): Promise<void> {
+  async changePin(
+    currentPin: string,
+    newPin: string,
+    target: 'staff' | 'admin' = 'staff',
+  ): Promise<void> {
     await this.ensureReady();
     if (!/^\d{4,6}$/.test(newPin)) {
       throw new BadRequestException('Mã PIN mới phải gồm 4–6 chữ số');
     }
-    const ok = await this.verify(currentPin);
-    if (!ok) {
-      throw new BadRequestException('Mã PIN hiện tại không đúng');
+    // Chỉ ADMIN mới được đổi PIN (dù đổi PIN nhân viên hay admin).
+    const adminHash = await this.getAdminPinHash();
+    if (!adminHash || !verifyPin(currentPin, adminHash)) {
+      throw new BadRequestException('Cần đúng mã PIN admin để đổi');
     }
-    await this.setPinHash(hashPin(newPin));
-    this.logger.log('Mã PIN nhân viên đã được đổi');
+    const key = target === 'admin' ? ADMIN_PIN_KEY : PIN_KEY;
+    await this.setPinHash(hashPin(newPin), key);
+    this.logger.log(`Đã đổi mã PIN ${target}`);
   }
 }

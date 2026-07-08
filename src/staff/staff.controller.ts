@@ -1,3 +1,8 @@
+// ============================================================
+//  POS BACKEND  src/staff/staff.controller.ts
+//  >> CHEP DE (truyen target)
+// ============================================================
+
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { ChangePinDto } from './dto/change-pin.dto';
 import { VerifyPinDto } from './dto/verify-pin.dto';
@@ -11,14 +16,15 @@ export class StaffController {
   @Post('verify')
   @HttpCode(200)
   async verify(@Body() dto: VerifyPinDto) {
-    return { ok: await this.staff.verify(dto.pin) };
+    const role = await this.staff.verifyRole(dto.pin);
+    return { ok: role !== null, role };
   }
 
   /** POST /api/staff/change-pin — { currentPin, newPin }. */
   @Post('change-pin')
   @HttpCode(200)
   async change(@Body() dto: ChangePinDto) {
-    await this.staff.changePin(dto.currentPin, dto.newPin);
+    await this.staff.changePin(dto.currentPin, dto.newPin, dto.target ?? 'staff');
     return { ok: true };
   }
 }
