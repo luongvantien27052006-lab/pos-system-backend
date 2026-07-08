@@ -1,3 +1,8 @@
+// ============================================================
+//  POS BACKEND  src/app.module.ts
+//  >> CHEP DE (dang ky VouchersModule)
+// ============================================================
+
 // ==================================================================
 //  POS BACKEND  (NestJS + raw pg)
 //  Dat tai:  src/app.module.ts
@@ -22,6 +27,7 @@ import { StoreModule } from './store/store.module';
 import { SyncModule } from './sync/sync.module';
 import { TablesModule } from './tables/tables.module';
 import { NewsModule } from './news/news.module';
+import { VouchersModule } from './vouchers/vouchers.module';
 
 @Module({
   imports: [
@@ -40,6 +46,7 @@ import { NewsModule } from './news/news.module';
     AppOrdersModule, // Tích hợp: nhận đơn online từ App, in bếp, cập nhật trạng thái
     StoreModule, // Proxy cấu hình giờ mở/đóng cửa sang App
     NewsModule, // Quản lý Tin tức (proxy sang App + upload ảnh)
+    VouchersModule, // Quản lý Voucher (proxy sang App)
     // Phần 2.3: PrintingModule  (in kép ESC/POS qua TCP 9100)
     // Phần 2.4: PaymentsModule  (VietQR động + webhook ngân hàng -> PAID)
     // Phần 2.5: DashboardModule (doanh thu real-time)
