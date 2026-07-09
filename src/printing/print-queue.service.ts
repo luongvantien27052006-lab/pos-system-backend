@@ -1,3 +1,8 @@
+// ============================================================
+//  POS BACKEND  src/printing/print-queue.service.ts
+//  >> CHEP DE (them health(): phat hien agent chet)
+// ============================================================
+
 // ==================================================================
 //  POS BACKEND  (NestJS + raw pg)
 //  Dat tai:  src/printing/print-queue.service.ts
@@ -45,6 +50,38 @@ export class PrintQueueService {
       [limit],
     );
     return rows;
+  }
+
+  /**
+   * Sức khoẻ hàng đợi in: agent còn sống không, có bill nào đang kẹt không.
+   *  - lastPrintedAt: lần cuối agent in xong 1 job.
+   *  - stuckCount: số job chờ quá 2 phút (agent tắt / mất mạng / sai IP).
+   */
+  async health(): Promise<{
+    pending: number;
+    stuckCount: number;
+    lastPrintedAt: string | null;
+    agentAlive: boolean;
+  }> {
+    const rows = await this.db.query<{
+      pending: string;
+      stuck: string;
+      last_printed_at: Date | null;
+    }>(
+      `SELECT
+         COUNT(*) FILTER (WHERE status IN ('pending','processing'))         AS pending,
+         COUNT(*) FILTER (WHERE status IN ('pending','processing')
+                            AND created_at < now() - interval '2 minutes')  AS stuck,
+         MAX(printed_at)                                                    AS last_printed_at
+       FROM print_jobs`,
+    );
+    const r = rows[0];
+    const pending = Number(r?.pending ?? 0);
+    const stuckCount = Number(r?.stuck ?? 0);
+    const lastPrintedAt = r?.last_printed_at
+      ? new Date(r.last_printed_at).toISOString()
+      : null;
+    return { pending, stuckCount, lastPrintedAt, agentAlive: stuckCount === 0 };
   }
 
   /** Agent báo đã in xong -> đánh dấu done. */

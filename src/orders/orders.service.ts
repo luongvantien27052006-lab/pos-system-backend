@@ -1,3 +1,8 @@
+// ============================================================
+//  POS BACKEND  src/orders/orders.service.ts
+//  >> CHEP DE (reprintBill)
+// ============================================================
+
 import {
   BadRequestException,
   Injectable,
@@ -407,6 +412,15 @@ export class OrdersService {
    *  - CK mặc định (đơn chưa in) -> in.
    *  - Kịch bản 3 (đã chọn tiền mặt -> đã in -> quay xe sang CK) -> KHÔNG in lại.
    */
+  /** In lại bill theo yêu cầu (thu ngân bấm nút). Luôn in, kể cả đã in rồi. */
+  async reprintBill(sessionId: number): Promise<{ ok: boolean }> {
+    const session = await this.getSessionRow(sessionId);
+    if (!session) return { ok: false };
+    const view = await this.buildSessionView(sessionId);
+    await this.printing.printDualBill(view);
+    return { ok: true };
+  }
+
   async printBillIfNeeded(sessionId: number): Promise<void> {
     const session = await this.getSessionRow(sessionId);
     if (!session || session.printed_at) return;

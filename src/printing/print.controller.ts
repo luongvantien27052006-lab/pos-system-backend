@@ -1,3 +1,8 @@
+// ============================================================
+//  POS BACKEND  src/printing/print.controller.ts
+//  >> CHEP DE (GET /print/health)
+// ============================================================
+
 // ==================================================================
 //  POS BACKEND  (NestJS + raw pg)
 //  Dat tai:  src/printing/print.controller.ts
@@ -39,6 +44,12 @@ export class PrintController {
     const n = Math.min(Math.max(Number(limit) || 10, 1), 50);
     const jobs = await this.queue.pull(n);
     return { jobs };
+  }
+
+  /** Trạng thái hàng đợi in — POS hiển thị cảnh báo khi agent chết. */
+  @Get('health')
+  health() {
+    return this.queue.health();
   }
 
   /** Agent báo đã in xong các job. */

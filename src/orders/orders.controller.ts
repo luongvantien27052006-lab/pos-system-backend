@@ -1,3 +1,8 @@
+// ============================================================
+//  POS BACKEND  src/orders/orders.controller.ts
+//  >> CHEP DE (POST /orders/:id/reprint)
+// ============================================================
+
 import {
   Body,
   Controller,
@@ -54,6 +59,12 @@ export class OrdersController {
   }
 
   /** KB1 bước 1 / KB2: chọn thanh toán tiền mặt. */
+  /** In lại bill cho đơn (khi máy in lỗi / khách xin bill). */
+  @Post(':sessionId/reprint')
+  reprint(@Param('sessionId', ParseIntPipe) sessionId: number) {
+    return this.orders.reprintBill(sessionId);
+  }
+
   @Post(':sessionId/pay/cash')
   payCash(@Param('sessionId', ParseIntPipe) sessionId: number) {
     return this.orders.chooseCashPayment(sessionId);
