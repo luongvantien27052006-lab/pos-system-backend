@@ -29,6 +29,7 @@ import { TablesModule } from './tables/tables.module';
 import { NewsModule } from './news/news.module';
 import { VouchersModule } from './vouchers/vouchers.module';
 import { FruitsModule } from './fruits/fruits.module';
+import { BillsModule } from './bills/bills.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { FruitsModule } from './fruits/fruits.module';
     NewsModule, // Quản lý Tin tức (proxy sang App + upload ảnh)
     VouchersModule, // Quản lý Voucher (proxy sang App)
     FruitsModule, // Quản lý Trái cây (proxy sang App)
+    BillsModule, // Lịch sử bill (quầy + bàn + app)
     // Phần 2.3: PrintingModule  (in kép ESC/POS qua TCP 9100)
     // Phần 2.4: PaymentsModule  (VietQR động + webhook ngân hàng -> PAID)
     // Phần 2.5: DashboardModule (doanh thu real-time)
