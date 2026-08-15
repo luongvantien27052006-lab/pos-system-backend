@@ -28,6 +28,7 @@ import { SyncModule } from './sync/sync.module';
 import { TablesModule } from './tables/tables.module';
 import { NewsModule } from './news/news.module';
 import { VouchersModule } from './vouchers/vouchers.module';
+import { FruitsModule } from './fruits/fruits.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { VouchersModule } from './vouchers/vouchers.module';
     StoreModule, // Proxy cấu hình giờ mở/đóng cửa sang App
     NewsModule, // Quản lý Tin tức (proxy sang App + upload ảnh)
     VouchersModule, // Quản lý Voucher (proxy sang App)
+    FruitsModule, // Quản lý Trái cây (proxy sang App)
     // Phần 2.3: PrintingModule  (in kép ESC/POS qua TCP 9100)
     // Phần 2.4: PaymentsModule  (VietQR động + webhook ngân hàng -> PAID)
     // Phần 2.5: DashboardModule (doanh thu real-time)
