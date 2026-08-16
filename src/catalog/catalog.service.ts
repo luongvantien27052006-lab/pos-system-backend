@@ -36,10 +36,16 @@ export class CatalogService {
          FROM products WHERE is_active = TRUE ORDER BY display_order, name`,
     );
     const options = await this.db.query<OptionRow>(
-      `SELECT po.product_id, o.id, o.name, o.price, o.group_name
+      `SELECT po.product_id, o.id, o.name,
+              COALESCE(po.price, o.price) AS price, o.group_name
          FROM product_options po JOIN options o ON o.id = po.option_id
         WHERE o.is_active = TRUE
-        ORDER BY o.group_name NULLS FIRST, o.name`,
+        ORDER BY o.group_name NULLS FIRST,
+          CASE WHEN o.group_name = 'Kích cỡ' THEN
+            CASE o.name WHEN 'S · 400g' THEN 1 WHEN 'M · 600g' THEN 2
+                        WHEN 'L · 800g' THEN 3 ELSE 4 END
+          ELSE 0 END,
+          o.name`,
     );
 
     const optionsByProduct = new Map<number, unknown[]>();

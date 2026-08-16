@@ -155,6 +155,47 @@ export class OrdersService {
           throw new BadRequestException(`Món "${product.name}" hiện không bán`);
         }
 
+        // Resolve option (giá override theo món) + tìm SIZE (trái cây).
+        const resolved: {
+          id: number;
+          name: string;
+          price: number;
+          isSize: boolean;
+        }[] = [];
+        let sizePrice: number | null = null;
+        for (const opt of item.options ?? []) {
+          const optionRes = await client.query<{
+            id: number;
+            name: string;
+            price: string;
+            group_name: string | null;
+          }>(
+            `SELECT o.id, o.name, COALESCE(po.price, o.price) AS price, o.group_name
+               FROM options o
+               JOIN product_options po ON po.option_id = o.id
+              WHERE o.id = $1 AND po.product_id = $2 AND o.is_active = TRUE`,
+            [opt.optionId, item.productId],
+          );
+          const option = optionRes.rows[0];
+          if (!option) {
+            throw new BadRequestException(
+              `Topping #${opt.optionId} không khả dụng`,
+            );
+          }
+          const isSize = option.group_name === 'Kích cỡ';
+          if (isSize) sizePrice = Number(option.price);
+          resolved.push({
+            id: option.id,
+            name: option.name,
+            price: Number(option.price),
+            isSize,
+          });
+        }
+
+        // Trái cây: giá dòng cha = giá SIZE (thay); món khác: giá món gốc.
+        const parentPrice =
+          sizePrice != null ? sizePrice : Number(product.price);
+
         const parentRes = await client.query<{ id: number }>(
           `INSERT INTO order_items
              (session_id, item_type, product_id, name_snapshot, unit_price, quantity, note)
@@ -164,34 +205,22 @@ export class OrdersService {
             sessionId,
             product.id,
             product.name,
-            product.price,
+            parentPrice,
             item.quantity,
             item.note ?? null,
           ],
         );
         const parentId = parentRes.rows[0].id;
 
-        for (const opt of item.options ?? []) {
-          const optionRes = await client.query<{
-            id: number;
-            name: string;
-            price: string;
-          }>(
-            `SELECT id, name, price FROM options WHERE id = $1 AND is_active = TRUE`,
-            [opt.optionId],
-          );
-          const option = optionRes.rows[0];
-          if (!option) {
-            throw new BadRequestException(
-              `Topping #${opt.optionId} không khả dụng`,
-            );
-          }
-          // Số lượng topping = số lượng món (combo đồng nhất).
+        for (const o of resolved) {
+          // Size: hiển thị dòng con nhưng giá 0 (đã tính vào dòng cha).
+          // Topping: cộng bình thường.
+          const linePrice = o.isSize ? 0 : o.price;
           await client.query(
             `INSERT INTO order_items
                (session_id, parent_item_id, item_type, option_id, name_snapshot, unit_price, quantity)
              VALUES ($1, $2, 'OPTION', $3, $4, $5, $6)`,
-            [sessionId, parentId, option.id, option.name, option.price, item.quantity],
+            [sessionId, parentId, o.id, o.name, linePrice, item.quantity],
           );
         }
       }

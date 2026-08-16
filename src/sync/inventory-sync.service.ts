@@ -134,10 +134,16 @@ export class InventorySyncService {
       price: string;
       group_name: string | null;
     }>(
-      `SELECT o.id, o.name, o.price, o.group_name
+      `SELECT o.id, o.name,
+              COALESCE(po.price, o.price) AS price, o.group_name
          FROM product_options po JOIN options o ON o.id = po.option_id
         WHERE po.product_id = $1 AND o.is_active = TRUE
-        ORDER BY o.group_name NULLS FIRST, o.name`,
+        ORDER BY o.group_name NULLS FIRST,
+          CASE WHEN o.group_name = 'Kích cỡ' THEN
+            CASE o.name WHEN 'S · 400g' THEN 1 WHEN 'M · 600g' THEN 2
+                        WHEN 'L · 800g' THEN 3 ELSE 4 END
+          ELSE 0 END,
+          o.name`,
       [productId],
     );
     return rows.map((o) => ({
