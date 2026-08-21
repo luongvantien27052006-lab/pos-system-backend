@@ -26,6 +26,7 @@ export interface Bill {
   createdAt: string | null;
   paymentMethod: string | null;
   paymentStatus?: string | null;
+  prepStatus?: string | null;
   fulfillment?: string | null;
   total: number;
   tableNumber?: string | null;
@@ -37,9 +38,9 @@ export interface Bill {
 export class BillsService {
   constructor(private readonly db: DatabaseService) {}
 
-  async list(limit = 200): Promise<Bill[]> {
-    const posBills = await this.loadPosBills(limit);
-    const appBills = await this.loadAppBills(limit);
+  async list(limit = 200, from?: string, to?: string): Promise<Bill[]> {
+    const posBills = await this.loadPosBills(limit, from, to);
+    const appBills = await this.loadAppBills(limit, from, to);
     const all = [...posBills, ...appBills].sort((a, b) => {
       const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -49,7 +50,11 @@ export class BillsService {
   }
 
   // ── Don tai quay/ban (order_sessions + order_items) ──
-  private async loadPosBills(limit: number): Promise<Bill[]> {
+  private async loadPosBills(
+    limit: number,
+    from?: string,
+    to?: string,
+  ): Promise<Bill[]> {
     const sessions = await this.db.query<{
       id: number;
       order_code: string;
@@ -65,9 +70,10 @@ export class BillsService {
          FROM order_sessions s
          LEFT JOIN tables t ON t.id = s.table_id
         WHERE s.status = 'PAID'
+          ${from && to ? 'AND s.completed_at >= $2 AND s.completed_at < $3' : ''}
         ORDER BY s.completed_at DESC NULLS LAST
         LIMIT $1`,
-      [limit],
+      from && to ? [limit, from, to] : [limit],
     );
     if (!sessions.length) return [];
 
@@ -126,12 +132,17 @@ export class BillsService {
   }
 
   // ── Don app (app_orders) ──
-  private async loadAppBills(limit: number): Promise<Bill[]> {
+  private async loadAppBills(
+    limit: number,
+    from?: string,
+    to?: string,
+  ): Promise<Bill[]> {
     const rows = await this.db.query<{
       order_code: string;
       fulfillment: string | null;
       payment_method: string | null;
       payment_status: string | null;
+      prep_status: string | null;
       customer_name: string | null;
       customer_phone: string | null;
       items: any;
@@ -140,12 +151,13 @@ export class BillsService {
       paid_at: Date | null;
     }>(
       `SELECT order_code, fulfillment, payment_method, payment_status,
-              customer_name, customer_phone, items, total_amount,
+              prep_status, customer_name, customer_phone, items, total_amount,
               received_at, paid_at
          FROM app_orders
+        ${from && to ? 'WHERE received_at >= $2 AND received_at < $3' : ''}
         ORDER BY received_at DESC
         LIMIT $1`,
-      [limit],
+      from && to ? [limit, from, to] : [limit],
     );
 
     return rows.map((a) => {
@@ -156,6 +168,7 @@ export class BillsService {
         createdAt: (a.paid_at ?? a.received_at)?.toISOString() ?? null,
         paymentMethod: a.payment_method,
         paymentStatus: a.payment_status,
+        prepStatus: a.prep_status,
         fulfillment: a.fulfillment,
         total: Number(a.total_amount ?? 0),
         tableNumber: null,
