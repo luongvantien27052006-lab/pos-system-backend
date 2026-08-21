@@ -3,6 +3,7 @@ export type PrepStatus =
   | 'CONFIRMED'
   | 'IN_PROGRESS'
   | 'READY'
+  | 'DELIVERING'
   | 'DELIVERED'
   | 'CANCELLED';
 
