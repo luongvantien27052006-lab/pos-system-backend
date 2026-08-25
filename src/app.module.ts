@@ -30,11 +30,13 @@ import { NewsModule } from './news/news.module';
 import { VouchersModule } from './vouchers/vouchers.module';
 import { FruitsModule } from './fruits/fruits.module';
 import { BillsModule } from './bills/bills.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     DatabaseModule,
+    ReviewsModule,
     RealtimeModule,
     DashboardModule, // Phần 2.5 — doanh thu real-time (global)
     CatalogModule, // Phần 3 — menu + danh sách bàn cho frontend
