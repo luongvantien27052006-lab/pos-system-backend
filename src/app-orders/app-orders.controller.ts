@@ -48,6 +48,19 @@ export class AppOrdersInternalController {
     }
     return this.service.cancelFromApp(body.appOrderId);
   }
+
+  /** App báo khách ĐÃ NHẬN HÀNG -> POS đánh dấu đã giao. Body: { appOrderId }. */
+  @Post('received')
+  received(
+    @Headers('x-internal-secret') secret: string | undefined,
+    @Body() body: { appOrderId?: string },
+  ) {
+    this.guard(secret);
+    if (!body?.appOrderId) {
+      return { ok: true, applied: false };
+    }
+    return this.service.markReceivedFromApp(body.appOrderId);
+  }
 }
 
 /**

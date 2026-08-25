@@ -198,6 +198,27 @@ export class AppOrdersService {
     return view;
   }
 
+  /**
+   * App báo khách ĐÃ NHẬN HÀNG -> đánh dấu đơn đã giao (DELIVERED).
+   * Idempotent, KHÔNG đẩy ngược 'app_order.status' về App (App đã tự set).
+   */
+  async markReceivedFromApp(
+    appOrderId: string,
+  ): Promise<{ ok: true; applied: boolean }> {
+    const row = await this.getRowByAppId(appOrderId);
+    if (!row) return { ok: true, applied: false };
+    if (row.prep_status === 'DELIVERED' || row.prep_status === 'CANCELLED') {
+      return { ok: true, applied: false };
+    }
+    await this.db.query(
+      `UPDATE app_orders SET prep_status = 'DELIVERED', updated_at = NOW() WHERE app_order_id = $1`,
+      [appOrderId],
+    );
+    const view = await this.getViewByAppId(appOrderId);
+    this.emitStatus(view);
+    return { ok: true, applied: true };
+  }
+
   /** Xác nhận đã thu tiền (chủ yếu cho COD sau khi giao) -> ghi nhận doanh thu. */
   async confirmPayment(appOrderId: string): Promise<AppOrderView> {
     const row = await this.getRowByAppId(appOrderId);
