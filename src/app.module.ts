@@ -31,6 +31,7 @@ import { VouchersModule } from './vouchers/vouchers.module';
 import { FruitsModule } from './fruits/fruits.module';
 import { BillsModule } from './bills/bills.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ReviewsModule } from './reviews/reviews.module';
     DatabaseModule,
     ReviewsModule,
     RealtimeModule,
+    AnalyticsModule,
     DashboardModule, // Phần 2.5 — doanh thu real-time (global)
     CatalogModule, // Phần 3 — menu + danh sách bàn cho frontend
     TablesModule, // Quản lý bàn (thêm/ngừng dùng) + nguồn cho mã QR
