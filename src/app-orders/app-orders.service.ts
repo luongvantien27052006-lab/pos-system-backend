@@ -38,6 +38,7 @@ interface AppOrderRow {
   prep_status: PrepStatus;
   note: string | null;
   received_at: Date;
+  scheduled_for: Date | null;
 }
 
 @Injectable()
@@ -72,10 +73,10 @@ export class AppOrdersService {
       `INSERT INTO app_orders
          (app_order_id, order_code, fulfillment, payment_method, payment_status,
           customer_name, customer_phone, customer_address, items, total_amount,
-          prep_status, note, received_at, paid_at)
+          prep_status, note, received_at, paid_at, scheduled_for)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,
                COALESCE($13::timestamptz, NOW()),
-               $14::timestamptz)
+               $14::timestamptz, $15::timestamptz)
        ON CONFLICT (app_order_id) DO NOTHING
        RETURNING id`,
       [
@@ -93,6 +94,7 @@ export class AppOrdersService {
         dto.note ?? null,
         dto.createdAt ?? null,
         paidAt,
+        dto.scheduledFor ?? null,
       ],
     );
 
@@ -374,6 +376,7 @@ export class AppOrdersService {
       prepStatus: r.prep_status,
       note: r.note,
       receivedAt: r.received_at,
+      scheduledFor: r.scheduled_for,
     };
   }
 }

@@ -31,4 +31,5 @@ export interface AppOrderView {
   prepStatus: PrepStatus;
   note: string | null;
   receivedAt: Date;
+  scheduledFor: Date | null;
 }

@@ -67,4 +67,7 @@ export class ReceiveAppOrderDto {
   @Type(() => Number) @IsInt() @Min(0) totalAmount!: number;
 
   @IsOptional() @IsString() note?: string;
+
+  /** ISO time giờ hẹn nhận (bỏ trống = giao ngay). */
+  @IsOptional() @IsString() scheduledFor?: string;
 }

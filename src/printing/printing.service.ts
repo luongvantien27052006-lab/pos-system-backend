@@ -296,6 +296,13 @@ export class PrintingService {
     b.align('left');
     b.line(`Mã đơn: ${order.orderCode}`);
     b.line(`Giờ: ${new Date(order.receivedAt).toLocaleString('vi-VN')}`);
+    if (order.scheduledFor) {
+      b.bold(true)
+        .line(
+          `** HEN GIO: ${new Date(order.scheduledFor).toLocaleString('vi-VN')} **`,
+        )
+        .bold(false);
+    }
     if (isPacking) {
       b.line(`Khách: ${order.customerName ?? '-'}`);
       if (order.customerPhone) b.line(`DT: ${order.customerPhone}`);
