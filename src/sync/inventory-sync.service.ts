@@ -157,10 +157,19 @@ export class InventorySyncService {
   private async pushProduct(productId: number, eventId: string): Promise<void> {
     const r = await this.loadRow(productId);
     if (!r) return;
-    const price = Math.round(Number(r.price));
-    if (price < 1000) throw new Error(`Giá món #${productId} < 1.000đ — App từ chối`);
-
     const options = await this.loadOptions(productId);
+
+    // Món "size thay giá" (trái cây): giá gốc có thể = 0. Dùng giá size NHỎ NHẤT
+    // làm giá hiển thị -> qua được kiểm tra + menu hiện "từ giá S" đúng.
+    const sizeOpts = options.filter((o) => o.groupName === 'Kích cỡ');
+    let price = Math.round(Number(r.price));
+    if (sizeOpts.length > 0) {
+      const minSize = Math.min(...sizeOpts.map((o) => Math.round(Number(o.price))));
+      if (minSize >= 1000) price = minSize;
+    }
+    if (price < 1000) {
+      throw new Error(`Giá món #${productId} < 1.000đ — App từ chối`);
+    }
 
     const ack = await this.callApp('/internal/menu/upsert', {
       eventId,
