@@ -160,6 +160,9 @@ export class PrintingService {
     const b = new EscPosBuilder(this.mode, this.codepage).init();
     const isCustomer = kind === 'CUSTOMER';
 
+    // ----- Logo ở đầu (chỉ hoá đơn khách) -----
+    if (isCustomer) b.align('center').logo().feed(1);
+
     // ----- Tiêu đề -----
     b.align('center').bold(true).size(2, 2);
     b.line(isCustomer ? 'HÓA ĐƠN THANH TOÁN' : 'PHIẾU CHẾ BIẾN');
@@ -287,6 +290,9 @@ export class PrintingService {
     const isPacking = kind === 'PACKING';
     const typeLabel = order.fulfillment === 'DELIVERY' ? 'GIAO HÀNG' : 'KHÁCH LẤY';
 
+    // Logo ở đầu phiếu giao cho khách (PACKING).
+    if (isPacking) b.align('center').logo().feed(1);
+
     b.align('center').bold(true).size(2, 2);
     b.line(isPacking ? `ĐƠN ONLINE - ${typeLabel}` : 'PHIẾU CHẾ BIẾN (ONLINE)');
     b.size(1, 1).bold(false);
@@ -296,13 +302,6 @@ export class PrintingService {
     b.align('left');
     b.line(`Mã đơn: ${order.orderCode}`);
     b.line(`Giờ: ${new Date(order.receivedAt).toLocaleString('vi-VN')}`);
-    if (order.scheduledFor) {
-      b.bold(true)
-        .line(
-          `** HEN GIO: ${new Date(order.scheduledFor).toLocaleString('vi-VN')} **`,
-        )
-        .bold(false);
-    }
     if (isPacking) {
       b.line(`Khách: ${order.customerName ?? '-'}`);
       if (order.customerPhone) b.line(`DT: ${order.customerPhone}`);

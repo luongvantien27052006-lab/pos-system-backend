@@ -1,4 +1,5 @@
 import * as iconv from 'iconv-lite';
+import { shopLogoBytes } from './shop-logo';
 
 export type VietnameseMode = 'strip' | 'cp1258';
 
@@ -89,6 +90,12 @@ export class EscPosBuilder {
   cut(): this {
     this.feed(3);
     return this.cmd(0x1d, 0x56, 0x00); // GS V 0 (cắt full)
+  }
+
+  /** In logo cửa hàng (ESC/POS raster). Dùng kèm align('center') để căn giữa. */
+  logo(): this {
+    this.chunks.push(shopLogoBytes());
+    return this;
   }
 
   build(): Buffer {
