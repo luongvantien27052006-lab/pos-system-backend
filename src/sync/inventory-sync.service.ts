@@ -67,6 +67,8 @@ export class InventorySyncService {
           await this.pushAvailability(ev.payload.productId, ev.event_id);
         } else if (ev.event_type === 'app_order.status') {
           await this.pushOrderStatus(ev.payload.appOrderId, ev.payload.status, ev.event_id);
+        } else if (ev.event_type === 'app_order.payment_received') {
+          await this.pushPaymentReceived(ev.payload.appOrderId, ev.event_id);
         }
         await this.db.query(`UPDATE sync_outbox SET status = 'DONE' WHERE id = $1`, [ev.id]);
       } catch (e) {
@@ -157,19 +159,10 @@ export class InventorySyncService {
   private async pushProduct(productId: number, eventId: string): Promise<void> {
     const r = await this.loadRow(productId);
     if (!r) return;
-    const options = await this.loadOptions(productId);
+    const price = Math.round(Number(r.price));
+    if (price < 1000) throw new Error(`Giá món #${productId} < 1.000đ — App từ chối`);
 
-    // Món "size thay giá" (trái cây): giá gốc có thể = 0. Dùng giá size NHỎ NHẤT
-    // làm giá hiển thị -> qua được kiểm tra + menu hiện "từ giá S" đúng.
-    const sizeOpts = options.filter((o) => o.groupName === 'Kích cỡ');
-    let price = Math.round(Number(r.price));
-    if (sizeOpts.length > 0) {
-      const minSize = Math.min(...sizeOpts.map((o) => Math.round(Number(o.price))));
-      if (minSize >= 1000) price = minSize;
-    }
-    if (price < 1000) {
-      throw new Error(`Giá món #${productId} < 1.000đ — App từ chối`);
-    }
+    const options = await this.loadOptions(productId);
 
     const ack = await this.callApp('/internal/menu/upsert', {
       eventId,
@@ -201,6 +194,11 @@ export class InventorySyncService {
   // ── Đẩy trạng thái đơn online về App ──
   private async pushOrderStatus(appOrderId: string, status: string, eventId: string): Promise<void> {
     await this.callApp('/internal/orders/status', { eventId, appOrderId, status });
+  }
+
+  // ── Đẩy "đã nhận tiền" đơn online về App (đối soát tiền cho hạng) ──
+  private async pushPaymentReceived(appOrderId: string, eventId: string): Promise<void> {
+    await this.callApp('/internal/orders/payment-received', { eventId, appOrderId });
   }
 
   // ── Test private networking ──
