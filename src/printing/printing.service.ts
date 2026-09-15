@@ -18,6 +18,17 @@ import {
 import { sendToPrinter } from './printer.transport';
 import { PrintQueueService } from './print-queue.service';
 
+// Thông tin cửa hàng in ở đầu bill (dưới logo). Tách dòng cho vừa giấy K80.
+const SHOP_ADDRESS_LINES = [
+  'Số 098, đường Thủy Nguyên, KĐT Ecopark,',
+  'Xuân Quan, Phụng Công, Hưng Yên',
+];
+const SHOP_HOTLINE = '0398853776';
+const SHOP_SLOGAN_LINES = [
+  'Mọng Fruits - "Trà trái cây tươi đậm vị"',
+  '"Uống là mê, Ăn là nghiền"',
+];
+
 type LienKind = 'CUSTOMER' | 'KITCHEN';
 type PrintMode = 'queue' | 'tcp';
 
@@ -155,13 +166,26 @@ export class PrintingService {
     }
   }
 
+  /** In đầu bill cho khách: logo + địa chỉ + hotline + slogan. */
+  private printShopHeader(b: EscPosBuilder): void {
+    b.align('center');
+    b.logo().feed(1);
+    for (const l of SHOP_ADDRESS_LINES) b.line(l);
+    b.line(`Hotline: ${SHOP_HOTLINE}`);
+    b.feed(1);
+    b.bold(true);
+    for (const l of SHOP_SLOGAN_LINES) b.line(l);
+    b.bold(false);
+    b.feed(1);
+  }
+
   /** Dựng bytes ESC/POS cho 1 liên. */
   private renderLien(order: OrderSessionView, kind: LienKind): Buffer {
     const b = new EscPosBuilder(this.mode, this.codepage).init();
     const isCustomer = kind === 'CUSTOMER';
 
-    // ----- Logo ở đầu (chỉ hoá đơn khách) -----
-    if (isCustomer) b.align('center').logo().feed(1);
+    // ----- Logo + địa chỉ + hotline + slogan (chỉ hoá đơn khách) -----
+    if (isCustomer) this.printShopHeader(b);
 
     // ----- Tiêu đề -----
     b.align('center').bold(true).size(2, 2);
@@ -290,8 +314,8 @@ export class PrintingService {
     const isPacking = kind === 'PACKING';
     const typeLabel = order.fulfillment === 'DELIVERY' ? 'GIAO HÀNG' : 'KHÁCH LẤY';
 
-    // Logo ở đầu phiếu giao cho khách (PACKING).
-    if (isPacking) b.align('center').logo().feed(1);
+    // Logo + địa chỉ + hotline + slogan (phiếu giao cho khách).
+    if (isPacking) this.printShopHeader(b);
 
     b.align('center').bold(true).size(2, 2);
     b.line(isPacking ? `ĐƠN ONLINE - ${typeLabel}` : 'PHIẾU CHẾ BIẾN (ONLINE)');
