@@ -188,11 +188,30 @@ export class AppOrdersService {
   }
 
   /** Thu ngân đổi trạng thái chế biến -> cập nhật + đẩy về App qua outbox. */
+  // Thứ tự trạng thái để chặn LÙI bậc (chỉ cho tiến hoặc huỷ).
+  private static readonly PREP_RANK: Record<PrepStatus, number> = {
+    PENDING: 0,
+    CONFIRMED: 1,
+    IN_PROGRESS: 2,
+    READY: 3,
+    DELIVERING: 4,
+    DELIVERED: 5,
+    CANCELLED: 99,
+  };
+
   async updateStatus(appOrderId: string, status: PrepStatus): Promise<AppOrderView> {
     const row = await this.getRowByAppId(appOrderId);
     if (!row) throw new NotFoundException(`Không tìm thấy đơn online ${appOrderId}`);
     if (row.prep_status === 'DELIVERED' || row.prep_status === 'CANCELLED') {
       throw new BadRequestException('Đơn đã kết thúc, không đổi trạng thái được');
+    }
+    // Chỉ cho TIẾN bậc (hoặc huỷ) — chặn lùi trạng thái gây rối bếp/khách.
+    if (
+      status !== 'CANCELLED' &&
+      AppOrdersService.PREP_RANK[status] <
+        AppOrdersService.PREP_RANK[row.prep_status]
+    ) {
+      throw new BadRequestException('Không thể lùi trạng thái đơn');
     }
 
     await this.db.query(

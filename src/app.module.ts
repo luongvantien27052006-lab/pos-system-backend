@@ -10,8 +10,10 @@
 // ==================================================================
 
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
+import { PosSecretGuard } from './common/guards/pos-secret.guard';
 import { validateEnv } from './config/env.validation';
 import { AppOrdersModule } from './app-orders/app-orders.module';
 import { CatalogModule } from './catalog/catalog.module';
@@ -60,5 +62,9 @@ import { AnalyticsModule } from './analytics/analytics.module';
     // Phần 2.5: DashboardModule (doanh thu real-time)
   ],
   controllers: [AppController],
+  providers: [
+    // Chặn gọi API trực tiếp (không qua proxy Next.js). Xem pos-secret.guard.ts.
+    { provide: APP_GUARD, useClass: PosSecretGuard },
+  ],
 })
 export class AppModule {}

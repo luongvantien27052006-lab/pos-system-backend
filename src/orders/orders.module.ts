@@ -2,11 +2,12 @@ import { Module } from '@nestjs/common';
 import { PrintingModule } from '../printing/printing.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
+import { SessionCleanupService } from './session-cleanup.service';
 
 @Module({
   imports: [PrintingModule],
   controllers: [OrdersController],
-  providers: [OrdersService],
+  providers: [OrdersService, SessionCleanupService],
   exports: [OrdersService], // Phần 2.4 (PaymentsModule) dùng lại markSessionPaid()
 })
 export class OrdersModule {}
