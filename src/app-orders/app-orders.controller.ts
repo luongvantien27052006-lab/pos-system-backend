@@ -91,4 +91,23 @@ export class AppOrdersController {
   confirmPayment(@Param('appOrderId') appOrderId: string) {
     return this.service.confirmPayment(appOrderId);
   }
+
+  /**
+   * Nhân viên báo KHÁCH KHÔNG LIÊN HỆ ĐƯỢC / TỪ CHỐI nhận (đơn COD quay về).
+   * Body: { reason: 'UNREACHABLE'|'REFUSED', photoUrl?, note? }
+   * (Ảnh đơn quay về do frontend upload trước rồi truyền photoUrl.)
+   */
+  @Post(':appOrderId/no-show')
+  reportNoShow(
+    @Param('appOrderId') appOrderId: string,
+    @Body() body: { reason?: string; photoUrl?: string; note?: string },
+  ) {
+    const reason = body?.reason === 'REFUSED' ? 'REFUSED' : 'UNREACHABLE';
+    return this.service.reportNoShow(
+      appOrderId,
+      reason,
+      body?.photoUrl ?? null,
+      body?.note ?? null,
+    );
+  }
 }

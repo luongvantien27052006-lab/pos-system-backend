@@ -292,6 +292,46 @@ export class AppOrdersService {
   }
 
   // =========================================================================
+  //  KHÁCH KHÔNG NHẬN / TỪ CHỐI (nhân viên bấm trên POS, kèm ảnh đơn quay về)
+  // =========================================================================
+  /**
+   * Nhân viên báo: khách KHÔNG liên hệ được / TỪ CHỐI nhận (đơn COD đã quay về).
+   * -> đánh dấu đơn CANCELLED trên POS + đẩy sang App để ghi nhận + áp chính
+   *    sách khoá/nhắc tài khoản (đối soát 2 đầu).
+   */
+  async reportNoShow(
+    appOrderId: string,
+    reason: 'UNREACHABLE' | 'REFUSED',
+    photoUrl: string | null,
+    note: string | null,
+  ): Promise<{ ok: true; applied: boolean }> {
+    const row = await this.getRowByAppId(appOrderId);
+    if (!row) throw new NotFoundException(`Không tìm thấy đơn online ${appOrderId}`);
+    if (row.payment_method !== 'COD') {
+      throw new BadRequestException('Chỉ áp dụng cho đơn COD (tiền mặt).');
+    }
+    if (row.prep_status === 'CANCELLED') {
+      return { ok: true, applied: false };
+    }
+    await this.db.query(
+      `UPDATE app_orders SET prep_status = 'CANCELLED', updated_at = NOW() WHERE app_order_id = $1`,
+      [appOrderId],
+    );
+    // Đẩy sang App (worker outbox -> POST /internal/orders/no-show).
+    await this.db.query(
+      `INSERT INTO sync_outbox (event_type, payload) VALUES ('app_order.no_show', $1)`,
+      [JSON.stringify({ appOrderId, reason, photoUrl, note })],
+    );
+    const view = await this.getViewByAppId(appOrderId);
+    this.realtime.emitAppOrderCancelled({
+      id: view.id,
+      appOrderId: view.appOrderId,
+      orderCode: view.orderCode,
+    });
+    return { ok: true, applied: true };
+  }
+
+  // =========================================================================
   //  HELPER
   // =========================================================================
   /**

@@ -69,6 +69,8 @@ export class InventorySyncService {
           await this.pushOrderStatus(ev.payload.appOrderId, ev.payload.status, ev.event_id);
         } else if (ev.event_type === 'app_order.payment_received') {
           await this.pushPaymentReceived(ev.payload.appOrderId, ev.event_id);
+        } else if (ev.event_type === 'app_order.no_show') {
+          await this.pushNoShow(ev.payload, ev.event_id);
         }
         await this.db.query(`UPDATE sync_outbox SET status = 'DONE' WHERE id = $1`, [ev.id]);
       } catch (e) {
@@ -199,6 +201,25 @@ export class InventorySyncService {
   // ── Đẩy "đã nhận tiền" đơn online về App (đối soát tiền cho hạng) ──
   private async pushPaymentReceived(appOrderId: string, eventId: string): Promise<void> {
     await this.callApp('/internal/orders/payment-received', { eventId, appOrderId });
+  }
+
+  // ── Đẩy "khách không nhận/từ chối" đơn online về App (đối soát + khoá/nhắc) ──
+  private async pushNoShow(
+    payload: {
+      appOrderId: string;
+      reason: string;
+      photoUrl?: string | null;
+      note?: string | null;
+    },
+    eventId: string,
+  ): Promise<void> {
+    await this.callApp('/internal/orders/no-show', {
+      eventId,
+      appOrderId: payload.appOrderId,
+      reason: payload.reason,
+      photoUrl: payload.photoUrl ?? null,
+      note: payload.note ?? null,
+    });
   }
 
   // ── Test private networking ──
