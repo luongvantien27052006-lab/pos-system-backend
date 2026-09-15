@@ -303,6 +303,7 @@ export class DashboardService {
                  expected, counted, difference, note, created_at`,
       [bd, expected, counted, difference, note ?? null],
     );
+    if (!row) throw new Error('Không lưu được chốt sổ');
     return this.mapReconcile(row);
   }
 
