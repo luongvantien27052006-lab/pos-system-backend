@@ -4,7 +4,7 @@
 //  >> CHEP DE (thay file co san)
 // ==================================================================
 
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 
 @Controller('dashboard')
@@ -24,5 +24,33 @@ export class DashboardController {
   @Get('revenue/month')
   monthlyRevenue() {
     return this.dashboard.getMonthlyRevenue();
+  }
+
+  /** So sánh nhanh: hôm nay vs hôm qua, tháng này vs tháng trước. */
+  @Get('revenue/compare')
+  compare() {
+    return this.dashboard.getRevenueCompare();
+  }
+
+  /** Tiền mặt kỳ vọng (để đối chiếu khi chốt sổ). ?date=YYYY-MM-DD (mặc định hôm nay). */
+  @Get('cash')
+  cashExpected(@Query('date') date?: string) {
+    return this.dashboard.getCashExpected(date);
+  }
+
+  /** Lưu một lần chốt sổ (đếm tiền mặt thực tế). */
+  @Post('cash')
+  saveCash(@Body() b: { date?: string; counted?: number; note?: string }) {
+    return this.dashboard.saveCashReconcile(
+      b?.date,
+      Number(b?.counted ?? 0),
+      b?.note,
+    );
+  }
+
+  /** Lịch sử chốt sổ gần đây. */
+  @Get('cash/history')
+  cashHistory() {
+    return this.dashboard.listCashReconciles(30);
   }
 }
