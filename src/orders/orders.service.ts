@@ -151,7 +151,11 @@ export class OrdersService {
         if (!product) {
           throw new BadRequestException(`Món #${item.productId} không tồn tại`);
         }
-        if (!product.is_active || !product.is_available) {
+        // Món đã xoá (is_active=false) -> chặn MỌI kênh. Món TẠM HẾT
+        // (is_available=false) -> chỉ chặn KHÁCH (TABLE_QR); THU NGÂN tại quầy
+        // (COUNTER_POS) vẫn bán được (chủ động khi còn hàng).
+        const isCounter = session.channel === 'COUNTER_POS';
+        if (!product.is_active || (!isCounter && !product.is_available)) {
           throw new BadRequestException(`Món "${product.name}" hiện không bán`);
         }
 
