@@ -23,6 +23,8 @@ export interface BillItem {
 export interface Bill {
   source: 'COUNTER' | 'TABLE' | 'APP';
   code: string | null;
+  sessionId?: number | null; // đơn quầy/bàn -> để in lại
+  appOrderId?: string | null; // đơn app -> để in lại
   createdAt: string | null;
   paymentMethod: string | null;
   paymentStatus?: string | null;
@@ -116,6 +118,7 @@ export class BillsService {
       return {
         source: s.channel === 'TABLE_QR' ? 'TABLE' : 'COUNTER',
         code: s.order_code,
+        sessionId: s.id,
         createdAt: (s.completed_at ?? s.created_at)?.toISOString() ?? null,
         paymentMethod: s.payment_method,
         total: Number(s.total_amount ?? 0),
@@ -138,6 +141,7 @@ export class BillsService {
     to?: string,
   ): Promise<Bill[]> {
     const rows = await this.db.query<{
+      app_order_id: string;
       order_code: string;
       fulfillment: string | null;
       payment_method: string | null;
@@ -150,7 +154,7 @@ export class BillsService {
       received_at: Date | null;
       paid_at: Date | null;
     }>(
-      `SELECT order_code, fulfillment, payment_method, payment_status,
+      `SELECT app_order_id, order_code, fulfillment, payment_method, payment_status,
               prep_status, customer_name, customer_phone, items, total_amount,
               received_at, paid_at
          FROM app_orders
@@ -165,6 +169,7 @@ export class BillsService {
       return {
         source: 'APP',
         code: a.order_code,
+        appOrderId: a.app_order_id,
         createdAt: (a.paid_at ?? a.received_at)?.toISOString() ?? null,
         paymentMethod: a.payment_method,
         paymentStatus: a.payment_status,

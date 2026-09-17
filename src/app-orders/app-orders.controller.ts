@@ -110,4 +110,10 @@ export class AppOrdersController {
       body?.note ?? null,
     );
   }
+
+  /** In lại phiếu bếp/tem cho đơn online (máy in lỗi / in thêm). */
+  @Post(':appOrderId/reprint')
+  reprint(@Param('appOrderId') appOrderId: string) {
+    return this.service.reprintAppOrder(appOrderId);
+  }
 }

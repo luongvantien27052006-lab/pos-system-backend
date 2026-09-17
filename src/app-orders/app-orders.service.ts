@@ -350,6 +350,14 @@ export class AppOrdersService {
     return { ok: true, applied: true };
   }
 
+  /** In LẠI phiếu bếp + tem cho đơn online (máy in lỗi / cần in thêm). */
+  async reprintAppOrder(appOrderId: string): Promise<{ ok: true }> {
+    const view = await this.getViewByAppId(appOrderId);
+    await this.printing.printAppOrder(view);
+    void this.printProductStamps(view);
+    return { ok: true };
+  }
+
   // =========================================================================
   //  HELPER
   // =========================================================================

@@ -34,6 +34,7 @@ import { FruitsModule } from './fruits/fruits.module';
 import { BillsModule } from './bills/bills.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { RefundsModule } from './refunds/refunds.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     VouchersModule, // Quản lý Voucher (proxy sang App)
     FruitsModule, // Quản lý Trái cây (proxy sang App)
     BillsModule, // Lịch sử bill (quầy + bàn + app)
+    RefundsModule, // Hoàn tiền đơn CK đã trả bị huỷ (proxy sang App)
     // Phần 2.3: PrintingModule  (in kép ESC/POS qua TCP 9100)
     // Phần 2.4: PaymentsModule  (VietQR động + webhook ngân hàng -> PAID)
     // Phần 2.5: DashboardModule (doanh thu real-time)
