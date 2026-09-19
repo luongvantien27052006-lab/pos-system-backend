@@ -33,7 +33,9 @@ export class CatalogService {
     );
     const products = await this.db.query<ProductRow>(
       `SELECT id, category_id, name, short_name, price, image_url, is_available
-         FROM products WHERE is_active = TRUE ORDER BY display_order, name`,
+         FROM products
+        WHERE is_active = TRUE AND is_available = TRUE
+        ORDER BY display_order, name`,
     );
     const options = await this.db.query<OptionRow>(
       `SELECT po.product_id, o.id, o.name,
