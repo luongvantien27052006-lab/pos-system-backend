@@ -4,7 +4,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
-interface CatRow {
+export interface CatRow {
   id: number;
   name: string;
   displayOrder: number;
