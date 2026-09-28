@@ -35,6 +35,7 @@ import { BillsModule } from './bills/bills.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { RefundsModule } from './refunds/refunds.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { RefundsModule } from './refunds/refunds.module';
     TablesModule, // Quản lý bàn (thêm/ngừng dùng) + nguồn cho mã QR
     StaffModule, // Xác thực PIN nhân viên + đổi PIN
     ProductsModule, // Quản lý sản phẩm + upload ảnh
+    CategoriesModule, // Quản lý danh mục món (thêm/sửa/ẩn)
     OptionsModule, // Quản lý topping/tùy chọn + gán món
     OrdersModule, // Phần 2.2 — tạo phiên, thêm món append-only, 3 kịch bản nghiệp vụ
     PaymentsModule, // Phần 2.4 — VietQR động + webhook SePay (idempotency)
