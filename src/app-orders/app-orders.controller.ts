@@ -77,6 +77,21 @@ export class AppOrdersController {
     return this.service.listActive();
   }
 
+  /**
+   * Đơn HẸN GIỜ sắp tới (App đang giữ, chưa đẩy bếp) — thu ngân xem trước.
+   * Đến giờ hẹn trừ 20 phút, App tự đẩy đơn sang như đơn thường.
+   */
+  @Get('scheduled')
+  async scheduled(): Promise<unknown> {
+    const base = (process.env.APP_INTERNAL_URL ?? '').replace(/\/+$/, '');
+    const res = await fetch(base + '/internal/orders/scheduled-upcoming', {
+      headers: { 'x-internal-secret': process.env.INTERNAL_SYNC_SECRET ?? '' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error(`App ${res.status}: ${await res.text()}`);
+    return res.json();
+  }
+
   /** Đổi trạng thái chế biến: CONFIRMED -> IN_PROGRESS -> READY -> DELIVERED. */
   @Patch(':appOrderId/status')
   updateStatus(
