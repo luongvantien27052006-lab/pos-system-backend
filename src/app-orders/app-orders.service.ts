@@ -140,6 +140,23 @@ export class AppOrdersService {
         ),
       );
 
+    // Báo App: quán đã NHẬN đơn -> App chuyển "Chờ xác nhận" -> "Đã xác nhận"
+    // (khách nhận thông báo + timeline Dynamic Island / Live Update cập nhật).
+    // POS lưu đơn ở CONFIRMED ngay khi nhận nên App phải theo cùng trạng thái,
+    // nếu không các bước sau (pha chế / sẵn sàng / giao) sẽ bị App từ chối.
+    if ((dto.status ?? 'CONFIRMED') === 'CONFIRMED') {
+      await this.db
+        .query(
+          `INSERT INTO sync_outbox (event_type, payload) VALUES ('app_order.status', $1)`,
+          [JSON.stringify({ appOrderId: dto.appOrderId, status: 'CONFIRMED' })],
+        )
+        .catch((e) =>
+          this.logger.warn(
+            `Không báo được App đã nhận đơn ${dto.orderCode}: ${e instanceof Error ? e.message : String(e)}`,
+          ),
+        );
+    }
+
     this.realtime.emitAppOrderIncoming({
       id: view.id,
       appOrderId: view.appOrderId,
