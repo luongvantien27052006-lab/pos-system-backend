@@ -4,7 +4,9 @@ import {
   ForbiddenException,
   Get,
   Headers,
+  Param,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ReviewsService } from './reviews.service';
 
@@ -37,5 +39,26 @@ export class ReviewsController {
   @Get('summary')
   summary() {
     return this.service.summary();
+  }
+
+  /** Đánh giá xấu (<= 3 sao) — app KHÔNG hiện, chỉ quán xem để xử lý. */
+  @Get('negative')
+  negative(@Query('status') status?: string) {
+    return this.service.negative(status === 'all' ? 'all' : 'open');
+  }
+
+  @Get('negative/count')
+  negativeCount() {
+    return this.service.negativeCount();
+  }
+
+  /** Đánh dấu đã xử lý / mở lại. Người xử lý lấy từ vai trò đăng nhập (proxy chèn). */
+  @Post(':id/handled')
+  handled(
+    @Param('id') id: string,
+    @Body() b: { handled?: boolean; note?: string },
+    @Headers('x-pos-user') user?: string,
+  ) {
+    return this.service.setHandled(id, b?.handled !== false, user, b?.note);
   }
 }
